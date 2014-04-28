@@ -118,6 +118,30 @@ openfile_cb (GtkWidget* widget, gpointer data)
 }
 
 static void
+cut_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_cut_clipboard (web_view);
+}
+
+static void
+copy_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_copy_clipboard (web_view);
+}
+
+static void
+paste_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_paste_clipboard (web_view);
+}
+
+static void
+delete_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_delete_selection (web_view);
+}
+
+static void
 options_cb (GtkWidget* widget, gpointer data)
 {
 	WebKitWebSettings *settings = webkit_web_view_get_settings (web_view);
@@ -188,50 +212,71 @@ create_menubar ()
 	menu_bar = gtk_menu_bar_new ();
 	gtk_widget_show (menu_bar);
 	
-	/* Create File and Help Menus */
+	/* Create File, Edit, and Help Menus */
 	GtkWidget* file_menu = gtk_menu_new ();
+	GtkWidget* edit_menu = gtk_menu_new ();
 	GtkWidget* options_menu = gtk_menu_new ();
 	GtkWidget* help_menu = gtk_menu_new ();
 	
-	/* Create the menu items and set icons */
+	/* Create the menu items (and set icons) */
 	GtkWidget* open_item = gtk_menu_item_new_with_label ("Open");
 	GtkWidget* quit_item = gtk_menu_item_new_with_label ("Quit");
+	GtkWidget* cut_item = gtk_menu_item_new_with_label ("Cut");
+	GtkWidget* copy_item = gtk_menu_item_new_with_label ("Copy");
+	GtkWidget* paste_item = gtk_menu_item_new_with_label ("Paste");
+	GtkWidget* delete_item = gtk_menu_item_new_with_label ("Delete");
 	GtkWidget* smooth_scrolling_item = gtk_menu_item_new_with_label ("Smooth Scrolling");
 	GtkWidget* about_item = gtk_menu_item_new_with_label ("About");
 	
 	/* Add them to the appropriate menu */
 	gtk_menu_append (GTK_MENU (file_menu), open_item);
 	gtk_menu_append (GTK_MENU (file_menu), quit_item);
+	gtk_menu_append (GTK_MENU (edit_menu), cut_item);
+	gtk_menu_append (GTK_MENU (edit_menu), copy_item);
+	gtk_menu_append (GTK_MENU (edit_menu), paste_item);
+	gtk_menu_append (GTK_MENU (edit_menu), delete_item);
 	gtk_menu_append (GTK_MENU (options_menu), smooth_scrolling_item);
 	gtk_menu_append (GTK_MENU (help_menu), about_item);
 	
 	/* Attach the callback functions to the activate signal */
 	gtk_signal_connect_object (GTK_OBJECT (open_item), "activate", GTK_SIGNAL_FUNC (openfile_cb), (gpointer) "file.open");
 	gtk_signal_connect_object (GTK_OBJECT (quit_item), "activate", GTK_SIGNAL_FUNC (destroy_cb), (gpointer) "file.quit");
+	gtk_signal_connect_object (GTK_OBJECT (cut_item), "activate", GTK_SIGNAL_FUNC (cut_cb), (gpointer) "edit.cut");
+	gtk_signal_connect_object (GTK_OBJECT (copy_item), "activate", GTK_SIGNAL_FUNC (copy_cb), (gpointer) "edit.copy");
+	gtk_signal_connect_object (GTK_OBJECT (paste_item), "activate", GTK_SIGNAL_FUNC (paste_cb), (gpointer) "edit.paste");
+	gtk_signal_connect_object (GTK_OBJECT (delete_item), "activate", GTK_SIGNAL_FUNC (delete_cb), (gpointer) "edit.delete");
 	gtk_signal_connect_object (GTK_OBJECT (smooth_scrolling_item), "activate", GTK_SIGNAL_FUNC (options_cb), (gpointer) "options.smooth-scrolling");
 	gtk_signal_connect_object (GTK_OBJECT (about_item), "activate", GTK_SIGNAL_FUNC (about_cb), (gpointer) "help.about");
 	
 	/* Show menu items */
 	gtk_widget_show (open_item);
 	gtk_widget_show (quit_item);
+	gtk_widget_show (cut_item);
+	gtk_widget_show (copy_item);
+	gtk_widget_show (paste_item);
+	gtk_widget_show (delete_item);
 	gtk_widget_show (smooth_scrolling_item);
 	gtk_widget_show (about_item);
 	
 	/* Create "File" and "Help" entries in menubar */
 	GtkWidget* file_item = gtk_menu_item_new_with_label ("File");
+	GtkWidget* edit_item = gtk_menu_item_new_with_label ("Edit");
 	GtkWidget* options_item = gtk_menu_item_new_with_label ("Options");
 	GtkWidget* help_item = gtk_menu_item_new_with_label ("Help");
 	gtk_widget_show (file_item);
+	gtk_widget_show (edit_item);
 	gtk_widget_show (options_item);
 	gtk_widget_show (help_item);
 	
 	/* Associate file_menu with file_item in the menubar */
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (file_item), file_menu);
+	gtk_menu_item_set_submenu (GTK_MENU_ITEM (edit_item), edit_menu);
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (options_item), options_menu);
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (help_item), help_menu);
 	
 	/* Add file_menu to menu_bar */
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), file_item);
+	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), edit_item);
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), options_item);
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), help_item);
 	
