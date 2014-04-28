@@ -1,3 +1,11 @@
+/*
+ * sb - simple browser
+ * 
+ * David Luco - <dluco11 at gmail dot com>
+ * 
+ * See LICENSE file for copyright and license details.
+ */
+
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 
@@ -18,6 +26,9 @@ static gchar* main_title;
 static gint load_progress;
 static guint status_context_id;
 
+/*
+ * Callback for activation of the url-bar - open web page in web-view
+ */
 static void
 activate_uri_entry_cb (GtkWidget* entry, gpointer data)
 {
@@ -26,6 +37,9 @@ activate_uri_entry_cb (GtkWidget* entry, gpointer data)
 	webkit_web_view_open (web_view, uri);
 }
 
+/*
+ * Update the title of the window with name of web page and load progress
+ */
 static void
 update_title (GtkWindow* window)
 {
@@ -38,6 +52,9 @@ update_title (GtkWindow* window)
 	g_free (title);
 }
 
+/*
+ * Callback for hovering over a link - show in statusbar
+ */
 static void
 link_hover_cb (WebKitWebView* page, const gchar* title, const gchar* link, gpointer data)
 {
@@ -47,6 +64,9 @@ link_hover_cb (WebKitWebView* page, const gchar* title, const gchar* link, gpoin
 		gtk_statusbar_push (main_statusbar, status_context_id, link);
 }
 
+/*
+ * Callback for a change in the title of a web page - update window title
+ */
 static void
 title_change_cb (WebKitWebView* web_view, WebKitWebFrame* web_frame, const gchar* title, gpointer data)
 {
@@ -56,6 +76,9 @@ title_change_cb (WebKitWebView* web_view, WebKitWebFrame* web_frame, const gchar
 	update_title (GTK_WINDOW (main_window));
 }
 
+/*
+ * Callback for change in progress of a page being loaded - update title of window
+ */
 static void
 progress_change_cb (WebKitWebView* page, gint progress, gpointer data)
 {
@@ -63,6 +86,9 @@ progress_change_cb (WebKitWebView* page, gint progress, gpointer data)
 	update_title (GTK_WINDOW (main_window));
 }
 
+/*
+ * Callback for a loaded page - update url-bar and button sensitivity
+ */
 static void
 load_commit_cb (WebKitWebView* page, WebKitWebFrame* frame, gpointer data)
 {
@@ -76,12 +102,18 @@ load_commit_cb (WebKitWebView* page, WebKitWebFrame* frame, gpointer data)
 	gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
 }
 
+/*
+ * Callback to exit program
+ */
 static void
 destroy_cb (GtkWidget* widget, gpointer data)
 {
 	gtk_main_quit ();
 }
 
+/*
+ * Callback for open-file menu item - open file-chooser dialog and open selected file in webview
+ */
 static void
 openfile_cb (GtkWidget* widget, gpointer data)
 {
@@ -117,6 +149,9 @@ openfile_cb (GtkWidget* widget, gpointer data)
 	gtk_widget_destroy (file_dialog);
 }
 
+/*
+ * Callback for options menu - toggle indicated setting
+ */
 static void
 options_cb (GtkWidget* widget, gpointer data)
 {
@@ -129,39 +164,74 @@ options_cb (GtkWidget* widget, gpointer data)
 	return;
 }
 
+/*
+ * Callback for about menu item - open about dialog
+ */
 static void
 about_cb (GtkWidget* widget, gpointer data)
 {
 	GtkWidget* about_dialog = gtk_about_dialog_new ();
+	
+	const gchar *authors[] = {"David Luco", "<dluco11@gmail.com>", NULL};
+	
+	/* Set program name and comments */
+	gtk_about_dialog_set_program_name (GTK_ABOUT_DIALOG (about_dialog), "sb");
+	gtk_about_dialog_set_comments (GTK_ABOUT_DIALOG (about_dialog), "A simple webkit/gtk browser, in the style of surf by suckless.org");
+	
+	/* Set logo to display in dialog */
+	gtk_about_dialog_set_logo_icon_name (GTK_ABOUT_DIALOG (about_dialog), "browser");
+	/* Set taskbar/window icon */
+	gtk_window_set_icon_name (GTK_WINDOW (about_dialog), "browser");
+	
+	/* Set authors, license, and website in dialog */
+	gtk_about_dialog_set_authors (GTK_ABOUT_DIALOG (about_dialog), authors);
+	gtk_about_dialog_set_license (GTK_ABOUT_DIALOG (about_dialog), "Distributed under the MIT license.\nhttp://www.opensource.org/licenses/mit-license.php");
+	gtk_about_dialog_set_website (GTK_ABOUT_DIALOG (about_dialog), "http://dluco.github.io/sb/");
+	
 	gtk_dialog_run (GTK_DIALOG (about_dialog));
 	
 	gtk_widget_destroy (about_dialog);
 }
 
+/*
+ * Callback for back button
+ */
 static void
 go_back_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_go_back (web_view);
 }
 
+/*
+ * Callback for forward button
+ */
 static void
 go_forward_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_go_forward (web_view);
 }
 
+/*
+ * Callback for refresh button - reload web page
+ */
 static void
 refresh_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_reload (web_view);
 }
 
+/*
+ * Callback for home button - open home page
+ */
 static void
 home_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_open (web_view, home_page);
 }
 
+/*
+ * Create a webkit webview instance in a scrolled window
+ */
 static GtkWidget*
 create_browser ()
 {
@@ -181,6 +251,9 @@ create_browser ()
 	return scrolled_window;
 }
 
+/*
+ * Set up menubar - file, options, and help menus
+ */
 static GtkWidget*
 create_menubar ()
 {
@@ -238,6 +311,9 @@ create_menubar ()
 	return (GtkWidget*)menu_bar;
 }
 
+/*
+ * Create statusbar - when hovering over a link, show in statusbar
+ */
 static GtkWidget*
 create_statusbar ()
 {
@@ -247,6 +323,9 @@ create_statusbar ()
 	return (GtkWidget*)main_statusbar;
 }
 
+/*
+ * Create the toolbar: back, forward, refresh, urlbar, home button
+ */
 static GtkWidget*
 create_toolbar ()
 {
@@ -288,18 +367,25 @@ create_toolbar ()
 	return toolbar;
 }
 
+/*
+ * Create the main window, set name and icon.
+ * Default geometry = 800x600
+ */
 static GtkWidget*
 create_window ()
 {
 	GtkWidget* window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_default_size (GTK_WINDOW (window), 800, 600);
 	gtk_widget_set_name (window, "sb");
+	gtk_window_set_icon_name (GTK_WINDOW (window), "browser");
 	g_signal_connect (G_OBJECT (window), "destroy", G_CALLBACK (destroy_cb), NULL);
 
 	return window;
 }
 
-/* Apply default settings to web-view */
+/*
+ * Apply default settings to web-view
+ */
 static void
 set_settings ()
 {
@@ -318,6 +404,9 @@ set_settings ()
 	webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
 }
 
+/*
+ * Main function of program
+ */
 int
 main (int argc, char* argv[])
 {

@@ -1,6 +1,6 @@
 TODO
 
+- add BETTER documentation to each function
 - icons in menus (harder than thought)
 - toggle options in "options" menu
-- file chooser dialog (DONE)
-- finish "about" dialog
+- set up right-click menus (context)
