@@ -85,10 +85,36 @@ destroy_cb (GtkWidget* widget, gpointer data)
 static void
 openfile_cb (GtkWidget* widget, gpointer data)
 {
-	GtkWidget* about_dialog = gtk_about_dialog_new ();
-	gtk_dialog_run (GTK_DIALOG (about_dialog));
+	GtkWidget* file_dialog = gtk_file_chooser_dialog_new ("Open File",
+														GTK_WINDOW (main_window),
+														GTK_FILE_CHOOSER_ACTION_OPEN,
+														"Cancel", GTK_RESPONSE_CANCEL,
+														"Open", GTK_RESPONSE_ACCEPT,
+														NULL);
 	
-	gtk_widget_destroy (about_dialog);
+	/* Add filters to dialog - all and html files */
+	GtkFileFilter* filter = gtk_file_filter_new ();
+	gtk_file_filter_set_name (filter, "All files");
+	gtk_file_filter_add_pattern (filter, "*");
+	gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (file_dialog), filter);
+	
+	filter = gtk_file_filter_new ();
+	gtk_file_filter_set_name (filter, "HTML files");
+	gtk_file_filter_add_mime_type (filter, "text/html");
+	gtk_file_filter_add_pattern (filter, "*.htm");
+	gtk_file_filter_add_pattern (filter, "*.html");
+	gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (file_dialog), filter);
+	
+	/* Run the dialog and check result. If a file was selected, open it in the web-view. */							
+	if (gtk_dialog_run (GTK_DIALOG (file_dialog)) == GTK_RESPONSE_ACCEPT)
+	{
+		char *filename;
+		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_dialog));
+		webkit_web_view_open (web_view, filename);
+		g_free (filename);
+	}
+	
+	gtk_widget_destroy (file_dialog);
 }
 
 static void
@@ -106,7 +132,10 @@ options_cb (GtkWidget* widget, gpointer data)
 static void
 about_cb (GtkWidget* widget, gpointer data)
 {
-	return;
+	GtkWidget* about_dialog = gtk_about_dialog_new ();
+	gtk_dialog_run (GTK_DIALOG (about_dialog));
+	
+	gtk_widget_destroy (about_dialog);
 }
 
 static void
@@ -164,7 +193,7 @@ create_menubar ()
 	GtkWidget* options_menu = gtk_menu_new ();
 	GtkWidget* help_menu = gtk_menu_new ();
 	
-	/* Create the menu items */
+	/* Create the menu items and set icons */
 	GtkWidget* open_item = gtk_menu_item_new_with_label ("Open");
 	GtkWidget* quit_item = gtk_menu_item_new_with_label ("Quit");
 	GtkWidget* smooth_scrolling_item = gtk_menu_item_new_with_label ("Smooth Scrolling");
