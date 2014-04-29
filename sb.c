@@ -150,7 +150,7 @@ openfile_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
- * Callback for options menu - toggle indicated setting
+ * Callback for edit.cut
  */
 static void
 cut_cb (GtkWidget* widget, gpointer data)
@@ -158,24 +158,36 @@ cut_cb (GtkWidget* widget, gpointer data)
 	webkit_web_view_cut_clipboard (web_view);
 }
 
+/*
+ * Callback for edit.copy
+ */
 static void
 copy_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_copy_clipboard (web_view);
 }
 
+/*
+ * Callback for edit.paste
+ */
 static void
 paste_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_paste_clipboard (web_view);
 }
 
+/* 
+ * Callback for edit.delete
+ */
 static void
 delete_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_delete_selection (web_view);
 }
 
+/*
+ * Callback for options menu - toggle indicated setting
+ */
 static void
 options_cb (GtkWidget* widget, gpointer data)
 {
@@ -276,7 +288,7 @@ create_browser ()
 }
 
 /*
- * Set up menubar - file, options, and help menus
+ * Set up menubar - file, edit, options, and help menus
  */
 static GtkWidget*
 create_menubar ()
