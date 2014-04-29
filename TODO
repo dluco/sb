@@ -1,6 +1,7 @@
 TODO
 ==
 
+- use "load-status" instead of "load-commited" signal
 - add BETTER documentation to each function
 - icons in menus (harder than thought)
 - toggle options in "options" menu
