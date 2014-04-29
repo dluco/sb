@@ -242,6 +242,42 @@ options_cb (GtkWidget* widget, gpointer data)
 	return;
 }
 
+static void
+user_agent_cb (GtkWidget* widget, gpointer data)
+{
+	GtkWidget* dialog = gtk_dialog_new_with_buttons ("Choose User Agent",
+													GTK_WINDOW (main_window),
+													GTK_DIALOG_DESTROY_WITH_PARENT,
+													GTK_STOCK_CANCEL,
+													GTK_RESPONSE_REJECT,
+													GTK_STOCK_OK,
+													GTK_RESPONSE_ACCEPT,
+													NULL);
+	
+	GtkWidget* vbox = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+	gtk_widget_show (vbox);
+	
+	GtkWidget* radio = gtk_radio_button_new_with_label (NULL, "Choice 1");
+	gtk_box_pack_start (GTK_BOX (vbox), radio, TRUE, TRUE, 0);
+	gtk_widget_show (radio);
+		
+	radio = gtk_radio_button_new_with_label_from_widget (GTK_RADIO_BUTTON (radio), "Choice 2");
+	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (radio), TRUE);
+	gtk_box_pack_start (GTK_BOX (vbox), radio, TRUE, TRUE, 0);
+	gtk_widget_show (radio);
+	
+	radio = gtk_radio_button_new_with_label_from_widget (GTK_RADIO_BUTTON (radio), "Choice 3");
+	gtk_box_pack_start (GTK_BOX (vbox), radio, TRUE, TRUE, 0);
+	gtk_widget_show (radio);
+	
+	if (gtk_dialog_run (GTK_DIALOG (dialog)) == GTK_RESPONSE_ACCEPT)
+	{
+		
+	}
+	
+	gtk_widget_destroy (dialog);
+}
+
 /*
  * Callback for about menu item - open about dialog
  */
@@ -363,6 +399,7 @@ create_menubar ()
 	GtkWidget* delete_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_DELETE, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (delete_item), "Delete");
 	GtkWidget* smooth_scrolling_item = gtk_menu_item_new_with_label ("Smooth Scrolling");
+	GtkWidget* user_agent_item = gtk_menu_item_new_with_label ("User Agent");
 	GtkWidget* about_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ABOUT, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (about_item), "About");
 	
@@ -375,6 +412,7 @@ create_menubar ()
 	gtk_menu_append (GTK_MENU (edit_menu), paste_item);
 	gtk_menu_append (GTK_MENU (edit_menu), delete_item);
 	gtk_menu_append (GTK_MENU (options_menu), smooth_scrolling_item);
+	gtk_menu_append (GTK_MENU (options_menu), user_agent_item);
 	gtk_menu_append (GTK_MENU (help_menu), about_item);
 	
 	/* Attach the callback functions to the activate signal */
@@ -386,6 +424,7 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (paste_item), "activate", GTK_SIGNAL_FUNC (paste_cb), (gpointer) "edit.paste");
 	gtk_signal_connect_object (GTK_OBJECT (delete_item), "activate", GTK_SIGNAL_FUNC (delete_cb), (gpointer) "edit.delete");
 	gtk_signal_connect_object (GTK_OBJECT (smooth_scrolling_item), "activate", GTK_SIGNAL_FUNC (options_cb), (gpointer) "options.smooth-scrolling");
+	gtk_signal_connect_object (GTK_OBJECT (user_agent_item), "activate", GTK_SIGNAL_FUNC (user_agent_cb), (gpointer) "options.user-agent");
 	gtk_signal_connect_object (GTK_OBJECT (about_item), "activate", GTK_SIGNAL_FUNC (about_cb), (gpointer) "help.about");
 	
 	/* Show menu items */
@@ -397,6 +436,7 @@ create_menubar ()
 	gtk_widget_show (paste_item);
 	gtk_widget_show (delete_item);
 	gtk_widget_show (smooth_scrolling_item);
+	gtk_widget_show (user_agent_item);
 	gtk_widget_show (about_item);
 	
 	/* Create "File" and "Help" entries in menubar */
