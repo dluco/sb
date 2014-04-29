@@ -27,6 +27,14 @@ static gchar* main_title;
 static gint load_progress;
 static guint status_context_id;
 
+static char* useragents[] = {
+	"Mozilla/5.0 (X11; Linux x86_64; rv:28.0) Gecko/20100101",
+	"Mozilla/5.0 (Windows NT 5.1; rv:31.0) Gecko/20100101 Firefox/31.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36",
+	"Mozilla/5.0 (compatible; MSIE 10.6; Windows NT 6.1; Trident/5.0; InfoPath.2; SLCC1; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET CLR 2.0.50727) 3gpp-gba UNTRUSTED/1.0",
+	"Mozilla/5.0 (Linux; U; Android 4.0.3; ko-kr; LG-L160L Build/IML74K) AppleWebkit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+};
+
 /*
  * Callback for activation of the url-bar - open web page in web-view
  */
@@ -270,9 +278,21 @@ user_agent_cb (GtkWidget* widget, gpointer data)
 	gtk_box_pack_start (GTK_BOX (vbox), radio, TRUE, TRUE, 0);
 	gtk_widget_show (radio);
 	
+	GtkWidget* combo_box = gtk_combo_box_text_new ();
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "sb (Default)");
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Firefox");
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Chrome");
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Internet Explorer");
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Mobile");
+	gtk_combo_box_set_active (GTK_COMBO_BOX (combo_box), 0);
+	gtk_box_pack_start (GTK_BOX (vbox), combo_box, TRUE, TRUE, 0);
+	gtk_widget_show (combo_box);
+	
 	if (gtk_dialog_run (GTK_DIALOG (dialog)) == GTK_RESPONSE_ACCEPT)
 	{
-		
+		WebKitWebSettings* settings = webkit_web_view_get_settings (web_view);
+		g_object_set (G_OBJECT (settings), "user-agent", useragents[gtk_combo_box_get_active (GTK_COMBO_BOX (combo_box))], NULL);
+		webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
 	}
 	
 	gtk_widget_destroy (dialog);
@@ -550,7 +570,7 @@ set_settings ()
 	WebKitWebSettings *settings = webkit_web_settings_new ();
 	
 	/* Apply default settings from config.h */
-	g_object_set (G_OBJECT (settings), "user-agent", useragent, NULL);
+	g_object_set (G_OBJECT (settings), "user-agent", useragents[0], NULL);
 	g_object_set (G_OBJECT (settings), "auto-load-images", loadimages, NULL);
 	g_object_set (G_OBJECT (settings), "enable-plugins", enableplugins, NULL);
 	g_object_set (G_OBJECT (settings), "enable-scripts", enablescripts, NULL);
