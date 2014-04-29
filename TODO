@@ -1,9 +1,6 @@
 TODO
-==
+====
 
-- use "load-status" instead of "load-commited" signal (DONE)
 - add BETTER documentation to each function
-- icons in menus (harder than thought) (DONE)
 - toggle options in "options" menu
 - set up right-click menus (context)
-- tooltips for buttons

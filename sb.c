@@ -65,6 +65,26 @@ link_hover_cb (WebKitWebView* page, const gchar* title, const gchar* link, gpoin
 		gtk_statusbar_push (main_statusbar, status_context_id, link);
 }
 
+static gboolean
+decide_download_cb (WebKitWebView* web_view, WebKitWebFrame* frame, WebKitNetworkRequest* request, gchar* mimetype,  WebKitWebPolicyDecision* policy_decision, gpointer data)
+{
+	if (!webkit_web_view_can_show_mime_type (web_view, mimetype))
+	{
+		webkit_web_policy_decision_download (policy_decision);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static gboolean
+init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer data)
+{
+	const gchar* uri = g_strconcat ("file://", download_dir, webkit_download_get_suggested_filename (download), NULL);
+	webkit_download_set_destination_uri (download, uri);
+	printf("%s\n", uri);
+	return TRUE;
+}
+
 /*
  * Callback for a change in the title of a web page - update window title
  */
@@ -234,7 +254,7 @@ about_cb (GtkWidget* widget, gpointer data)
 	
 	/* Set program name and comments */
 	gtk_about_dialog_set_program_name (GTK_ABOUT_DIALOG (about_dialog), "sb");
-	gtk_about_dialog_set_comments (GTK_ABOUT_DIALOG (about_dialog), "A simple webkit/gtk browser, in the style of surf by suckless.org");
+	gtk_about_dialog_set_comments (GTK_ABOUT_DIALOG (about_dialog), "A simple webkit/gtk browser, in the style of surf and midori");
 	
 	/* Set logo to display in dialog */
 	gtk_about_dialog_set_logo_icon_name (GTK_ABOUT_DIALOG (about_dialog), "browser");
@@ -305,6 +325,8 @@ create_browser ()
 	g_signal_connect (G_OBJECT (web_view), "load-progress-changed", G_CALLBACK (progress_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "notify::load-status", G_CALLBACK (load_status_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "hovering-over-link", G_CALLBACK (link_hover_cb), web_view);
+	g_signal_connect (G_OBJECT (web_view), "mime-type-policy-decision-requested", G_CALLBACK (decide_download_cb), web_view);
+	g_signal_connect (G_OBJECT (web_view), "download-requested", G_CALLBACK (init_download_cb), web_view);
 
 	return scrolled_window;
 }
