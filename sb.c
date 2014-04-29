@@ -6,6 +6,7 @@
  * See LICENSE file for copyright and license details.
  */
 
+#include <stdio.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 
@@ -80,27 +81,42 @@ title_change_cb (WebKitWebView* web_view, WebKitWebFrame* web_frame, const gchar
  * Callback for change in progress of a page being loaded - update title of window
  */
 static void
-progress_change_cb (WebKitWebView* page, gint progress, gpointer data)
+progress_change_cb (WebKitWebView* web_view, gint progress, gpointer data)
 {
 	load_progress = progress;
 	update_title (GTK_WINDOW (main_window));
 }
 
 /*
- * Callback for a loaded page - update url-bar and button sensitivity
+ * Callback for a change in the load status of a web view
  */
 static void
-load_commit_cb (WebKitWebView* page, WebKitWebFrame* frame, gpointer data)
+load_status_change_cb (WebKitWebView* web_view, gpointer data)
 {
-	/* Update uri in entry-bar */
-	const gchar* uri = webkit_web_frame_get_uri(frame);
-	if (uri)
-		gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
-		
-	/* Update buttons - back, forward */
-	gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
-	gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
+	WebKitWebFrame* frame;
+	/*WebKitWebDataSource* source;
+	WebKitNetworkRequest* request;*/
+	const gchar* uri;
+	
+	switch (webkit_web_view_get_load_status (web_view))
+	{
+	case WEBKIT_LOAD_COMMITTED:
+		/* Update uri in entry-bar */
+		frame = webkit_web_view_get_main_frame (web_view);
+		uri = webkit_web_frame_get_uri (frame);
+		if (uri)
+			gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
+		break;
+	case WEBKIT_LOAD_FINISHED:
+		/* Update buttons - back, forward */
+		gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
+		gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
+		break;
+	default:
+		break;
+	}
 }
+
 
 /*
  * Callback to exit program
@@ -147,6 +163,12 @@ openfile_cb (GtkWidget* widget, gpointer data)
 	}
 	
 	gtk_widget_destroy (file_dialog);
+}
+
+static void
+print_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_frame_print (webkit_web_view_get_main_frame (web_view));
 }
 
 /*
@@ -281,7 +303,7 @@ create_browser ()
 
 	g_signal_connect (G_OBJECT (web_view), "title-changed", G_CALLBACK (title_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "load-progress-changed", G_CALLBACK (progress_change_cb), web_view);
-	g_signal_connect (G_OBJECT (web_view), "load-committed", G_CALLBACK (load_commit_cb), web_view);
+	g_signal_connect (G_OBJECT (web_view), "notify::load-status", G_CALLBACK (load_status_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "hovering-over-link", G_CALLBACK (link_hover_cb), web_view);
 
 	return scrolled_window;
@@ -305,6 +327,7 @@ create_menubar ()
 	
 	/* Create the menu items (and set icons) */
 	GtkWidget* open_item = gtk_menu_item_new_with_label ("Open");
+	GtkWidget* print_item = gtk_menu_item_new_with_label ("Print");
 	GtkWidget* quit_item = gtk_menu_item_new_with_label ("Quit");
 	GtkWidget* cut_item = gtk_menu_item_new_with_label ("Cut");
 	GtkWidget* copy_item = gtk_menu_item_new_with_label ("Copy");
@@ -315,6 +338,7 @@ create_menubar ()
 	
 	/* Add them to the appropriate menu */
 	gtk_menu_append (GTK_MENU (file_menu), open_item);
+	gtk_menu_append (GTK_MENU (file_menu), print_item);
 	gtk_menu_append (GTK_MENU (file_menu), quit_item);
 	gtk_menu_append (GTK_MENU (edit_menu), cut_item);
 	gtk_menu_append (GTK_MENU (edit_menu), copy_item);
@@ -325,6 +349,7 @@ create_menubar ()
 	
 	/* Attach the callback functions to the activate signal */
 	gtk_signal_connect_object (GTK_OBJECT (open_item), "activate", GTK_SIGNAL_FUNC (openfile_cb), (gpointer) "file.open");
+	gtk_signal_connect_object (GTK_OBJECT (print_item), "activate", GTK_SIGNAL_FUNC (print_cb), (gpointer) "file.print");
 	gtk_signal_connect_object (GTK_OBJECT (quit_item), "activate", GTK_SIGNAL_FUNC (destroy_cb), (gpointer) "file.quit");
 	gtk_signal_connect_object (GTK_OBJECT (cut_item), "activate", GTK_SIGNAL_FUNC (cut_cb), (gpointer) "edit.cut");
 	gtk_signal_connect_object (GTK_OBJECT (copy_item), "activate", GTK_SIGNAL_FUNC (copy_cb), (gpointer) "edit.copy");
@@ -335,6 +360,7 @@ create_menubar ()
 	
 	/* Show menu items */
 	gtk_widget_show (open_item);
+	gtk_widget_show (print_item);
 	gtk_widget_show (quit_item);
 	gtk_widget_show (cut_item);
 	gtk_widget_show (copy_item);
@@ -412,6 +438,7 @@ create_toolbar ()
 	item = gtk_tool_item_new ();
 	gtk_tool_item_set_expand (item, TRUE);
 	uri_entry = gtk_entry_new ();
+	/*gtk_entry_set_icon_from_stock (GTK_ENTRY (uri_entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_MEDIA_PLAY);*/
 	gtk_container_add (GTK_CONTAINER (item), uri_entry);
 	g_signal_connect (G_OBJECT (uri_entry), "activate", G_CALLBACK (activate_uri_entry_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
