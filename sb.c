@@ -326,15 +326,23 @@ create_menubar ()
 	GtkWidget* help_menu = gtk_menu_new ();
 	
 	/* Create the menu items (and set icons) */
-	GtkWidget* open_item = gtk_menu_item_new_with_label ("Open");
-	GtkWidget* print_item = gtk_menu_item_new_with_label ("Print");
-	GtkWidget* quit_item = gtk_menu_item_new_with_label ("Quit");
-	GtkWidget* cut_item = gtk_menu_item_new_with_label ("Cut");
-	GtkWidget* copy_item = gtk_menu_item_new_with_label ("Copy");
-	GtkWidget* paste_item = gtk_menu_item_new_with_label ("Paste");
-	GtkWidget* delete_item = gtk_menu_item_new_with_label ("Delete");
+	GtkWidget* open_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_OPEN, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (open_item), "Open");
+	GtkWidget* print_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PRINT, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (print_item), "Print");
+	GtkWidget* quit_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_QUIT, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (quit_item), "Quit");
+	GtkWidget* cut_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_CUT, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (cut_item), "Cut");
+	GtkWidget* copy_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_COPY, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (copy_item), "Copy");
+	GtkWidget* paste_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PASTE, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (paste_item), "Paste");
+	GtkWidget* delete_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_DELETE, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (delete_item), "Delete");
 	GtkWidget* smooth_scrolling_item = gtk_menu_item_new_with_label ("Smooth Scrolling");
-	GtkWidget* about_item = gtk_menu_item_new_with_label ("About");
+	GtkWidget* about_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ABOUT, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (about_item), "About");
 	
 	/* Add them to the appropriate menu */
 	gtk_menu_append (GTK_MENU (file_menu), open_item);
@@ -419,16 +427,19 @@ create_toolbar ()
 
 	/* the back button */
 	back_button = gtk_tool_button_new_from_stock (GTK_STOCK_GO_BACK);
+	gtk_widget_set_tooltip_text (GTK_WIDGET (back_button), "Go back to the previous page");
 	g_signal_connect (G_OBJECT (back_button), "clicked", G_CALLBACK (go_back_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), GTK_TOOL_ITEM (back_button), -1);
 
 	/* The forward button */
 	forward_button = gtk_tool_button_new_from_stock (GTK_STOCK_GO_FORWARD);
+	gtk_widget_set_tooltip_text (GTK_WIDGET (forward_button), "Go to the next page");
 	g_signal_connect (G_OBJECT (forward_button), "clicked", G_CALLBACK (go_forward_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), GTK_TOOL_ITEM (forward_button), -1);
 	
 	/* The refresh button */
 	refresh_button = gtk_tool_button_new_from_stock (GTK_STOCK_REFRESH);
+	gtk_widget_set_tooltip_text (GTK_WIDGET (refresh_button), "Reload the current page");
 	g_signal_connect (G_OBJECT (refresh_button), "clicked", G_CALLBACK (refresh_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), GTK_TOOL_ITEM (refresh_button), -1);
 	
@@ -445,6 +456,7 @@ create_toolbar ()
 
 	/* The home button */
 	item = gtk_tool_button_new_from_stock (GTK_STOCK_HOME);
+	gtk_widget_set_tooltip_text (GTK_WIDGET (item), "Go to home page");
 	g_signal_connect (G_OBJECT (item), "clicked", G_CALLBACK (home_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
 
