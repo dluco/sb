@@ -51,7 +51,23 @@ activate_uri_entry_cb (GtkWidget* entry, gpointer data)
 static void
 activate_search_engine_entry_cb (GtkWidget* entry, gpointer data)
 {
-	return;
+	const gchar* uri = gtk_entry_get_text (GTK_ENTRY (entry));
+	g_assert (uri);
+	webkit_web_view_open (web_view, uri);
+}
+
+static void
+search_engine_entry_icon_cb (GtkEntry *entry, GtkEntryIconPosition icon_pos, GdkEvent *event, gpointer data)
+{
+	switch (icon_pos)
+	{
+		case GTK_ENTRY_ICON_PRIMARY:
+			/* TODO: implement search engine chooser */
+			break;
+		case GTK_ENTRY_ICON_SECONDARY:
+			activate_search_engine_entry_cb (GTK_WIDGET (entry), data);
+			break;
+	}
 }
 
 /*
@@ -682,23 +698,27 @@ create_toolbar ()
 	GtkToolItem* item;
 
 	/* The URL entry */
-	item = gtk_tool_item_new ();
-	gtk_tool_item_set_expand (item, TRUE);
 	uri_entry = gtk_entry_new ();
-	/*gtk_entry_set_icon_from_stock (GTK_ENTRY (uri_entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_MEDIA_PLAY);*/
-	gtk_container_add (GTK_CONTAINER (item), uri_entry);
 	g_signal_connect (G_OBJECT (uri_entry), "activate", G_CALLBACK (activate_uri_entry_cb), NULL);
-	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
 	
 	/* The search-engine entry */
-	item = gtk_tool_item_new ();
-	/*gtk_tool_item_set_expand (item, TRUE);*/
 	search_engine_entry = gtk_entry_new ();
+	gtk_entry_set_icon_from_stock (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_PRIMARY, GTK_STOCK_FILE);
 	gtk_entry_set_icon_from_stock (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_FIND);
-	gtk_container_add (GTK_CONTAINER (item), search_engine_entry);
-	g_signal_connect (G_OBJECT (uri_entry), "activate", G_CALLBACK (activate_search_engine_entry_cb), NULL);
-	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
+	/*gtk_entry_set_icon_activatable (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_PRIMARY, FALSE);*/
+	g_signal_connect (G_OBJECT (search_engine_entry), "activate", G_CALLBACK (activate_search_engine_entry_cb), NULL);
+	g_signal_connect (G_OBJECT (search_engine_entry), "icon-press", G_CALLBACK (search_engine_entry_icon_cb), NULL);
 
+	/* Paned widget to hold uri entry and search-engine entry */
+	GtkWidget* h_paned = gtk_hpaned_new ();
+	gtk_paned_pack1 (GTK_PANED (h_paned), uri_entry, TRUE, TRUE);
+	gtk_paned_pack2 (GTK_PANED (h_paned), search_engine_entry, FALSE, TRUE);
+	
+	item = gtk_tool_item_new ();
+	gtk_tool_item_set_expand (item, TRUE);
+	gtk_container_add (GTK_CONTAINER (item), h_paned);
+	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
+	
 	/* The home button */
 	item = gtk_tool_button_new_from_stock (GTK_STOCK_HOME);
 	gtk_widget_set_tooltip_text (GTK_WIDGET (item), "Go to home page");
