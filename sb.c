@@ -20,6 +20,7 @@ static GtkToolItem* back_button;
 static GtkToolItem* forward_button;
 static GtkToolItem* refresh_button;
 static GtkWidget* uri_entry;
+static GtkWidget* search_engine_entry;
 
 static GtkStatusbar* main_statusbar;
 static WebKitWebView* web_view;
@@ -27,6 +28,7 @@ static gchar* main_title;
 static gint load_progress;
 static guint status_context_id;
 
+static GtkEntryBuffer* search_buffer;
 static char* useragents[] = {
 	"Mozilla/5.0 (X11; U; Unix; en-US) AppleWebKit/537.15 (KHTML, like Gecko) Chrome/24.0.1295.0 Safari/537.15 sb/0.1",
 	"Mozilla/5.0 (Windows NT 5.1; rv:31.0) Gecko/20100101 Firefox/31.0",
@@ -44,6 +46,12 @@ activate_uri_entry_cb (GtkWidget* entry, gpointer data)
 	const gchar* uri = gtk_entry_get_text (GTK_ENTRY (entry));
 	g_assert (uri);
 	webkit_web_view_open (web_view, uri);
+}
+
+static void
+activate_search_engine_entry_cb (GtkWidget* entry, gpointer data)
+{
+	return;
 }
 
 /*
@@ -272,7 +280,7 @@ find_dialog_cb (GtkWidget* widget, gpointer data)
 	GtkWidget* label = gtk_label_new ("Find what:");
 	
 	/* Set up entry - entry activation activates the find button as well */
-	GtkWidget* find_entry = gtk_entry_new ();
+	GtkWidget* find_entry = gtk_entry_new_with_buffer (GTK_ENTRY_BUFFER (search_buffer));
 	gtk_entry_set_activates_default (GTK_ENTRY (find_entry), TRUE);
 	
 	/* Pack label and entry into hbox */
@@ -353,7 +361,7 @@ zoom_reset_cb (GtkWidget* widget, gpointer data)
  * Settings dialog - set smooth-scrolling, private browsing, useragent
  */
 static void
-settings_cb (GtkWidget* widget, gpointer data)
+settings_dialog_cb (GtkWidget* widget, gpointer data)
 {
 	GtkWidget* dialog = gtk_dialog_new_with_buttons ("sb Settings",
 													GTK_WINDOW (main_window),
@@ -583,7 +591,7 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (zoom_in_item), "activate", GTK_SIGNAL_FUNC (zoom_in_cb), (gpointer) "view.zoom-in");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_out_item), "activate", GTK_SIGNAL_FUNC (zoom_out_cb), (gpointer) "view.zoom-out");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_reset_item), "activate", GTK_SIGNAL_FUNC (zoom_reset_cb), (gpointer) "view.zoom-reset");
-	gtk_signal_connect_object (GTK_OBJECT (settings_item), "activate", GTK_SIGNAL_FUNC (settings_cb), (gpointer) "tools.settings");
+	gtk_signal_connect_object (GTK_OBJECT (settings_item), "activate", GTK_SIGNAL_FUNC (settings_dialog_cb), (gpointer) "tools.settings");
 	gtk_signal_connect_object (GTK_OBJECT (about_item), "activate", GTK_SIGNAL_FUNC (about_cb), (gpointer) "help.about");
 	
 	/* Show menu items */
@@ -681,6 +689,15 @@ create_toolbar ()
 	gtk_container_add (GTK_CONTAINER (item), uri_entry);
 	g_signal_connect (G_OBJECT (uri_entry), "activate", G_CALLBACK (activate_uri_entry_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
+	
+	/* The search-engine entry */
+	item = gtk_tool_item_new ();
+	/*gtk_tool_item_set_expand (item, TRUE);*/
+	search_engine_entry = gtk_entry_new ();
+	gtk_entry_set_icon_from_stock (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_FIND);
+	gtk_container_add (GTK_CONTAINER (item), search_engine_entry);
+	g_signal_connect (G_OBJECT (uri_entry), "activate", G_CALLBACK (activate_search_engine_entry_cb), NULL);
+	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
 
 	/* The home button */
 	item = gtk_tool_button_new_from_stock (GTK_STOCK_HOME);
@@ -747,6 +764,7 @@ main (int argc, char* argv[])
 	main_window = create_window ();
 	gtk_container_add (GTK_CONTAINER (main_window), vbox);
 	
+	search_buffer = gtk_entry_buffer_new (NULL, -1);
 	set_settings ();
 	gchar* uri = (gchar*) (argc > 1 ? argv[1] : home_page);
 	webkit_web_view_open (web_view, uri);
