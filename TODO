@@ -2,3 +2,4 @@ TODO
 ====
 
 - set up right-click menus (context)
+- use gtk-notebook to acheive tabs
