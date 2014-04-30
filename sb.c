@@ -28,7 +28,7 @@ static gint load_progress;
 static guint status_context_id;
 
 static char* useragents[] = {
-	"Mozilla/5.0 (X11; Linux x86_64; rv:28.0) Gecko/20100101",
+	"Mozilla/5.0 (X11; U; Unix; en-US) AppleWebKit/537.15 (KHTML, like Gecko) Chrome/24.0.1295.0 Safari/537.15 sb/0.1",
 	"Mozilla/5.0 (Windows NT 5.1; rv:31.0) Gecko/20100101 Firefox/31.0",
 	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36",
 	"Mozilla/5.0 (compatible; MSIE 10.6; Windows NT 6.1; Trident/5.0; InfoPath.2; SLCC1; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET CLR 2.0.50727) 3gpp-gba UNTRUSTED/1.0",
@@ -73,6 +73,9 @@ link_hover_cb (WebKitWebView* page, const gchar* title, const gchar* link, gpoin
 		gtk_statusbar_push (main_statusbar, status_context_id, link);
 }
 
+/*
+ * Decide if the web page/file can be viewed - if not, then download it
+ */
 static gboolean
 decide_download_cb (WebKitWebView* web_view, WebKitWebFrame* frame, WebKitNetworkRequest* request, gchar* mimetype,  WebKitWebPolicyDecision* policy_decision, gpointer data)
 {
@@ -84,6 +87,9 @@ decide_download_cb (WebKitWebView* web_view, WebKitWebFrame* frame, WebKitNetwor
 	return FALSE;
 }
 
+/*
+ * Start the download of a file - use the server-recommended file name
+ */
 static gboolean
 init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer data)
 {
@@ -128,20 +134,20 @@ load_status_change_cb (WebKitWebView* web_view, gpointer data)
 	
 	switch (webkit_web_view_get_load_status (web_view))
 	{
-	case WEBKIT_LOAD_COMMITTED:
-		/* Update uri in entry-bar */
-		frame = webkit_web_view_get_main_frame (web_view);
-		uri = webkit_web_frame_get_uri (frame);
-		if (uri)
-			gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
-		break;
-	case WEBKIT_LOAD_FINISHED:
-		/* Update buttons - back, forward */
-		gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
-		gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
-		break;
-	default:
-		break;
+		case WEBKIT_LOAD_COMMITTED:
+			/* Update uri in entry-bar */
+			frame = webkit_web_view_get_main_frame (web_view);
+			uri = webkit_web_frame_get_uri (frame);
+			if (uri)
+				gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
+			break;
+		case WEBKIT_LOAD_FINISHED:
+			/* Update buttons - back, forward */
+			gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
+			gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
+			break;
+		default:
+			break;
 	}
 }
 
@@ -156,7 +162,7 @@ destroy_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
- * Callback for open-file menu item - open file-chooser dialog and open selected file in webview
+ * Callback for file.open - open file-chooser dialog and open selected file in webview
  */
 static void
 openfile_cb (GtkWidget* widget, gpointer data)
@@ -193,6 +199,9 @@ openfile_cb (GtkWidget* widget, gpointer data)
 	gtk_widget_destroy (file_dialog);
 }
 
+/*
+ * Open print dialog for the current web page
+ */
 static void
 print_cb (GtkWidget* widget, gpointer data)
 {
@@ -200,7 +209,7 @@ print_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
- * Callback for edit.cut
+ * Callback for edit.cut - cut current selection
  */
 static void
 cut_cb (GtkWidget* widget, gpointer data)
@@ -209,7 +218,7 @@ cut_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
- * Callback for edit.copy
+ * Callback for edit.copy - copy current selection
  */
 static void
 copy_cb (GtkWidget* widget, gpointer data)
@@ -218,7 +227,7 @@ copy_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
- * Callback for edit.paste
+ * Callback for edit.paste - paste current selection
  */
 static void
 paste_cb (GtkWidget* widget, gpointer data)
@@ -227,7 +236,7 @@ paste_cb (GtkWidget* widget, gpointer data)
 }
 
 /* 
- * Callback for edit.delete
+ * Callback for edit.delete - delete current selection
  */
 static void
 delete_cb (GtkWidget* widget, gpointer data)
@@ -235,30 +244,114 @@ delete_cb (GtkWidget* widget, gpointer data)
 	webkit_web_view_delete_selection (web_view);
 }
 
+/*
+ * Dialog to search for text in current web-view
+ */
 static void
-find_cb (GtkWidget* widget, gpointer data)
+find_dialog_cb (GtkWidget* widget, gpointer data)
 {
-	return;
+	GtkWidget* dialog = gtk_dialog_new_with_buttons ("Find",
+													GTK_WINDOW (main_window),
+													GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+													GTK_STOCK_CANCEL,
+													GTK_RESPONSE_REJECT,
+													GTK_STOCK_FIND,
+													GTK_RESPONSE_ACCEPT,
+													NULL);
+	
+	/* Get area for entry and toggles, and get the find button */
+	GtkWidget* content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+	GtkWidget* find_button = gtk_dialog_get_widget_for_response (GTK_DIALOG (dialog), GTK_RESPONSE_ACCEPT);
+	
+	/* Set "Find" button as default button */
+	gtk_widget_set_can_default (find_button, TRUE);
+	gtk_widget_grab_default (find_button);
+	
+	/* Create a hbox to hold label and entry */
+	GtkWidget* hbox = gtk_hbox_new (FALSE, 0);
+	GtkWidget* label = gtk_label_new ("Find what:");
+	
+	/* Set up entry - entry activation activates the find button as well */
+	GtkWidget* find_entry = gtk_entry_new ();
+	gtk_entry_set_activates_default (GTK_ENTRY (find_entry), TRUE);
+	
+	/* Pack label and entry into hbox */
+	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 5);
+	gtk_box_pack_start (GTK_BOX (hbox), find_entry, FALSE, FALSE, 5);
+	
+	/* Pack hbox into the content area */
+	gtk_box_pack_start (GTK_BOX (content_area), hbox, FALSE, FALSE, 5);
+	
+	/* Set up toggles for matching case, searching forward, and wrapping the search */
+	GtkWidget* case_button = gtk_check_button_new_with_label ("Match case");
+	gtk_box_pack_start (GTK_BOX (content_area), case_button, FALSE, FALSE, 5);
+	
+	GtkWidget* find_forward_button = gtk_check_button_new_with_label ("Search forward");
+	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (find_forward_button), TRUE);
+	gtk_box_pack_start (GTK_BOX (content_area), find_forward_button, FALSE, FALSE, 5);
+	
+	GtkWidget* wrap_button = gtk_check_button_new_with_label ("Wrap search");
+	gtk_box_pack_start (GTK_BOX (content_area), wrap_button, FALSE, FALSE, 5);
+	
+	/* Show all widgets */
+	gtk_widget_show (label);
+	gtk_widget_show (find_entry);
+	gtk_widget_show (hbox);
+	gtk_widget_show (case_button);
+	gtk_widget_show (wrap_button);
+	gtk_widget_show (find_forward_button);
+	
+	/* Run dialog and check result */
+	gint result = gtk_dialog_run (GTK_DIALOG (dialog));
+	switch (result)
+	{
+		/* "Find" button was pressed/activated - perform search */
+		case GTK_RESPONSE_ACCEPT:
+			webkit_web_view_search_text (web_view,
+										gtk_entry_get_text (GTK_ENTRY (find_entry)),
+										gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (case_button)),
+										gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (find_forward_button)),
+										gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (wrap_button)));
+			break;
+		/* Cancelled or closed - do nothing */
+		default:
+			break;
+	}
+
+	/* Destroy the dialog */
+	gtk_widget_destroy (dialog);
 }
 
+/*
+ * Zoom in web-view by 10%
+ */
 static void
 zoom_in_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_zoom_in (web_view);
 }
 
+/*
+ * Zoom out web-view by 10%
+ */
 static void
 zoom_out_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_zoom_out (web_view);
 }
 
+/*
+ * Reset zoom level to 100%
+ */
 static void
 zoom_reset_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_set_zoom_level (web_view, 1.0);
 }
 
+/*
+ * Settings dialog - set smooth-scrolling, private browsing, useragent
+ */
 static void
 settings_cb (GtkWidget* widget, gpointer data)
 {
@@ -275,18 +368,21 @@ settings_cb (GtkWidget* widget, gpointer data)
 	WebKitWebSettings* settings = webkit_web_view_get_settings (web_view);
 	gboolean isactive = FALSE;
 	
+	/* Check-button to control smooth-scrolling */
 	GtkWidget* smooth_scrolling_button = gtk_check_button_new_with_label ("Enable smooth-scrolling");
 	g_object_get (G_OBJECT (settings), "enable-smooth-scrolling", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (smooth_scrolling_button), isactive);
-	gtk_box_pack_start (GTK_BOX (vbox), smooth_scrolling_button, TRUE, TRUE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox), smooth_scrolling_button, TRUE, TRUE, 5);
 	gtk_widget_show (smooth_scrolling_button);
 	
+	/* Check-button to control private browsing */
 	GtkWidget* private_browsing_button = gtk_check_button_new_with_label ("Enable private browsing");
 	g_object_get (G_OBJECT (settings), "enable-private-browsing", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (private_browsing_button), isactive);
-	gtk_box_pack_start (GTK_BOX (vbox), private_browsing_button, TRUE, TRUE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox), private_browsing_button, TRUE, TRUE, 5);
 	gtk_widget_show (private_browsing_button);
 	
+	/* Combox-box to choose the useragent to use */
 	GtkWidget* combo_box = gtk_combo_box_text_new ();
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "sb (Default)");
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Firefox");
@@ -294,22 +390,29 @@ settings_cb (GtkWidget* widget, gpointer data)
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Internet Explorer");
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Mobile");
 	gtk_combo_box_set_active (GTK_COMBO_BOX (combo_box), 0);
-	gtk_box_pack_start (GTK_BOX (vbox), combo_box, TRUE, TRUE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox), combo_box, FALSE, FALSE, 5);
 	gtk_widget_show (combo_box);
 	
-	if (gtk_dialog_run (GTK_DIALOG (dialog)) == GTK_RESPONSE_ACCEPT)
+	gint result = gtk_dialog_run (GTK_DIALOG (dialog));
+	switch (result)
 	{
-		/* Set smooth-scrolling from selection */
-		g_object_set (G_OBJECT (settings), "enable-smooth-scrolling", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (smooth_scrolling_button)), NULL);
-		
-		/* Set private browsing from selection */
-		g_object_set (G_OBJECT (settings), "enable-private-browsing", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (private_browsing_button)), NULL);
-		
-		/* Set user-agent from selection */
-		g_object_set (G_OBJECT (settings), "user-agent", useragents[gtk_combo_box_get_active (GTK_COMBO_BOX (combo_box))], NULL);
-		webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
+		case GTK_RESPONSE_ACCEPT:
+			/* Set smooth-scrolling from selection */
+			g_object_set (G_OBJECT (settings), "enable-smooth-scrolling", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (smooth_scrolling_button)), NULL);
+			
+			/* Set private browsing from selection */
+			g_object_set (G_OBJECT (settings), "enable-private-browsing", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (private_browsing_button)), NULL);
+			
+			/* Set user-agent from selection */
+			g_object_set (G_OBJECT (settings), "user-agent", useragents[gtk_combo_box_get_active (GTK_COMBO_BOX (combo_box))], NULL);
+			webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
+			
+			break;
+		default:
+			break;
 	}
 	
+	/* Destroy the dialog */
 	gtk_widget_destroy (dialog);
 }
 
@@ -476,7 +579,7 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (copy_item), "activate", GTK_SIGNAL_FUNC (copy_cb), (gpointer) "edit.copy");
 	gtk_signal_connect_object (GTK_OBJECT (paste_item), "activate", GTK_SIGNAL_FUNC (paste_cb), (gpointer) "edit.paste");
 	gtk_signal_connect_object (GTK_OBJECT (delete_item), "activate", GTK_SIGNAL_FUNC (delete_cb), (gpointer) "edit.delete");
-	gtk_signal_connect_object (GTK_OBJECT (find_item), "activate", GTK_SIGNAL_FUNC (find_cb), (gpointer) "edit.find");
+	gtk_signal_connect_object (GTK_OBJECT (find_item), "activate", GTK_SIGNAL_FUNC (find_dialog_cb), (gpointer) "edit.find");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_in_item), "activate", GTK_SIGNAL_FUNC (zoom_in_cb), (gpointer) "view.zoom-in");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_out_item), "activate", GTK_SIGNAL_FUNC (zoom_out_cb), (gpointer) "view.zoom-out");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_reset_item), "activate", GTK_SIGNAL_FUNC (zoom_reset_cb), (gpointer) "view.zoom-reset");
