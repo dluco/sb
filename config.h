@@ -12,6 +12,6 @@ static char* download_dir = "/home/david/Downloads/";
 static gboolean enablespatialbrowsing = FALSE;
 static gboolean enableplugins = TRUE;
 static gboolean enablescripts = TRUE;
-static gboolean enableinspector = TRUE;
+static gboolean enableinspector = FALSE;
 static gboolean loadimages = TRUE;
 static gboolean enablespellchecking = TRUE;

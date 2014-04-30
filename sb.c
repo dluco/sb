@@ -37,6 +37,17 @@ static char* useragents[] = {
 	"Mozilla/5.0 (Linux; U; Android 4.0.3; ko-kr; LG-L160L Build/IML74K) AppleWebkit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
 };
 
+typedef struct engine {
+	char* name;
+	char* url;
+} engine;
+
+static int search_engine_current = 0;
+static engine search_engines[] = {
+	{"Google", "https://www.google.ca/#q="},
+	{"Duck Duck Go", "https://duckduckgo.com/?q="}
+};
+
 /*
  * Callback for activation of the url-bar - open web page in web-view
  */
@@ -51,9 +62,43 @@ activate_uri_entry_cb (GtkWidget* entry, gpointer data)
 static void
 activate_search_engine_entry_cb (GtkWidget* entry, gpointer data)
 {
-	const gchar* uri = gtk_entry_get_text (GTK_ENTRY (entry));
+	const gchar* uri = g_strconcat (search_engines[search_engine_current].url, gtk_entry_get_text (GTK_ENTRY (entry)), NULL);
 	g_assert (uri);
 	webkit_web_view_open (web_view, uri);
+}
+
+static void
+choose_search_engine_dialog ()
+{
+	GtkWidget* dialog = gtk_dialog_new_with_buttons ("Engine...",
+													GTK_WINDOW (main_window),
+													GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+													GTK_STOCK_CANCEL,
+													GTK_RESPONSE_REJECT,
+													GTK_STOCK_OK,
+													GTK_RESPONSE_ACCEPT,
+													NULL);
+													
+	GtkWidget* vbox = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+	
+	GtkWidget* combo_box = gtk_combo_box_text_new ();
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Google");
+	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Duck Duck Go");
+	gtk_combo_box_set_active (GTK_COMBO_BOX (combo_box), search_engine_current);
+	gtk_box_pack_start (GTK_BOX (vbox), combo_box, FALSE, FALSE, 10);
+	gtk_widget_show (combo_box);
+	
+	gint result = gtk_dialog_run (GTK_DIALOG (dialog));
+	switch (result)
+	{
+		case GTK_RESPONSE_ACCEPT:
+			search_engine_current = gtk_combo_box_get_active (GTK_COMBO_BOX (combo_box));
+			break;
+		default:
+			break;
+	}
+	
+	gtk_widget_destroy (dialog);
 }
 
 static void
@@ -62,7 +107,7 @@ search_engine_entry_icon_cb (GtkEntry *entry, GtkEntryIconPosition icon_pos, Gdk
 	switch (icon_pos)
 	{
 		case GTK_ENTRY_ICON_PRIMARY:
-			/* TODO: implement search engine chooser */
+			choose_search_engine_dialog ();
 			break;
 		case GTK_ENTRY_ICON_SECONDARY:
 			activate_search_engine_entry_cb (GTK_WIDGET (entry), data);
@@ -119,7 +164,6 @@ init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer da
 {
 	const gchar* uri = g_strconcat ("file://", download_dir, webkit_download_get_suggested_filename (download), NULL);
 	webkit_download_set_destination_uri (download, uri);
-	printf("%s\n", uri);
 	return TRUE;
 }
 
@@ -152,8 +196,6 @@ static void
 load_status_change_cb (WebKitWebView* web_view, gpointer data)
 {
 	WebKitWebFrame* frame;
-	/*WebKitWebDataSource* source;
-	WebKitNetworkRequest* request;*/
 	const gchar* uri;
 	
 	switch (webkit_web_view_get_load_status (web_view))
@@ -214,7 +256,7 @@ openfile_cb (GtkWidget* widget, gpointer data)
 	/* Run the dialog and check result. If a file was selected, open it in the web-view. */							
 	if (gtk_dialog_run (GTK_DIALOG (file_dialog)) == GTK_RESPONSE_ACCEPT)
 	{
-		char *filename;
+		gchar *filename;
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_dialog));
 		webkit_web_view_open (web_view, filename);
 		g_free (filename);
@@ -396,15 +438,21 @@ settings_dialog_cb (GtkWidget* widget, gpointer data)
 	GtkWidget* smooth_scrolling_button = gtk_check_button_new_with_label ("Enable smooth-scrolling");
 	g_object_get (G_OBJECT (settings), "enable-smooth-scrolling", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (smooth_scrolling_button), isactive);
-	gtk_box_pack_start (GTK_BOX (vbox), smooth_scrolling_button, TRUE, TRUE, 5);
+	gtk_box_pack_start (GTK_BOX (vbox), smooth_scrolling_button, TRUE, TRUE, 2);
 	gtk_widget_show (smooth_scrolling_button);
 	
 	/* Check-button to control private browsing */
 	GtkWidget* private_browsing_button = gtk_check_button_new_with_label ("Enable private browsing");
 	g_object_get (G_OBJECT (settings), "enable-private-browsing", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (private_browsing_button), isactive);
-	gtk_box_pack_start (GTK_BOX (vbox), private_browsing_button, TRUE, TRUE, 5);
+	gtk_box_pack_start (GTK_BOX (vbox), private_browsing_button, TRUE, TRUE, 2);
 	gtk_widget_show (private_browsing_button);
+	
+	GtkWidget* inspector_button = gtk_check_button_new_with_label ("Enable web inspector");
+	g_object_get (G_OBJECT (settings), "enable-developer-extras", &isactive, NULL);
+	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (inspector_button), isactive);
+	gtk_box_pack_start (GTK_BOX (vbox), inspector_button, TRUE, TRUE, 2);
+	gtk_widget_show (inspector_button);
 	
 	/* Combox-box to choose the useragent to use */
 	GtkWidget* combo_box = gtk_combo_box_text_new ();
@@ -426,6 +474,8 @@ settings_dialog_cb (GtkWidget* widget, gpointer data)
 			
 			/* Set private browsing from selection */
 			g_object_set (G_OBJECT (settings), "enable-private-browsing", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (private_browsing_button)), NULL);
+			
+			g_object_set (G_OBJECT (settings), "enable-developer-extras", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (inspector_button)), NULL);
 			
 			/* Set user-agent from selection */
 			g_object_set (G_OBJECT (settings), "user-agent", useragents[gtk_combo_box_get_active (GTK_COMBO_BOX (combo_box))], NULL);
@@ -705,7 +755,8 @@ create_toolbar ()
 	search_engine_entry = gtk_entry_new ();
 	gtk_entry_set_icon_from_stock (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_PRIMARY, GTK_STOCK_FILE);
 	gtk_entry_set_icon_from_stock (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_SECONDARY, GTK_STOCK_FIND);
-	/*gtk_entry_set_icon_activatable (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_PRIMARY, FALSE);*/
+	gtk_entry_set_icon_tooltip_text (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_PRIMARY, "Choose Search Engine");
+	gtk_entry_set_icon_tooltip_text (GTK_ENTRY (search_engine_entry), GTK_ENTRY_ICON_SECONDARY, "Search");
 	g_signal_connect (G_OBJECT (search_engine_entry), "activate", G_CALLBACK (activate_search_engine_entry_cb), NULL);
 	g_signal_connect (G_OBJECT (search_engine_entry), "icon-press", G_CALLBACK (search_engine_entry_icon_cb), NULL);
 
