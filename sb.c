@@ -236,6 +236,30 @@ delete_cb (GtkWidget* widget, gpointer data)
 }
 
 static void
+find_cb (GtkWidget* widget, gpointer data)
+{
+	return;
+}
+
+static void
+zoom_in_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_zoom_in (web_view);
+}
+
+static void
+zoom_out_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_zoom_out (web_view);
+}
+
+static void
+zoom_reset_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_set_zoom_level (web_view, 1.0);
+}
+
+static void
 settings_cb (GtkWidget* widget, gpointer data)
 {
 	GtkWidget* dialog = gtk_dialog_new_with_buttons ("sb Settings",
@@ -391,6 +415,7 @@ create_menubar ()
 	/* Create File, Edit, and Help Menus */
 	GtkWidget* file_menu = gtk_menu_new ();
 	GtkWidget* edit_menu = gtk_menu_new ();
+	GtkWidget* view_menu = gtk_menu_new ();
 	GtkWidget* tools_menu = gtk_menu_new ();
 	GtkWidget* help_menu = gtk_menu_new ();
 	
@@ -409,19 +434,38 @@ create_menubar ()
 	gtk_menu_item_set_label (GTK_MENU_ITEM (paste_item), "Paste");
 	GtkWidget* delete_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_DELETE, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (delete_item), "Delete");
-	GtkWidget* settings_item = gtk_menu_item_new_with_label ("Settings");
+	GtkWidget* find_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_FIND, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (find_item), "Find...");
+	GtkWidget* zoom_in_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_IN, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_in_item), "Zoom In");
+	GtkWidget* zoom_out_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_OUT, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_out_item), "Zoom Out");
+	GtkWidget* zoom_reset_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_100, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_reset_item), "Reset Zoom");
+	GtkWidget* settings_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PREFERENCES, NULL);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (settings_item), "Settings");
 	GtkWidget* about_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ABOUT, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (about_item), "About");
 	
 	/* Add them to the appropriate menu */
 	gtk_menu_append (GTK_MENU (file_menu), open_item);
 	gtk_menu_append (GTK_MENU (file_menu), print_item);
+	gtk_menu_append (GTK_MENU (file_menu), gtk_separator_menu_item_new ());
 	gtk_menu_append (GTK_MENU (file_menu), quit_item);
+	
 	gtk_menu_append (GTK_MENU (edit_menu), cut_item);
 	gtk_menu_append (GTK_MENU (edit_menu), copy_item);
 	gtk_menu_append (GTK_MENU (edit_menu), paste_item);
 	gtk_menu_append (GTK_MENU (edit_menu), delete_item);
+	gtk_menu_append (GTK_MENU (edit_menu), gtk_separator_menu_item_new ());
+	gtk_menu_append (GTK_MENU (edit_menu), find_item);
+	
+	gtk_menu_append (GTK_MENU (view_menu), zoom_in_item);
+	gtk_menu_append (GTK_MENU (view_menu), zoom_out_item);
+	gtk_menu_append (GTK_MENU (view_menu), zoom_reset_item);
+	
 	gtk_menu_append (GTK_MENU (tools_menu), settings_item);
+	
 	gtk_menu_append (GTK_MENU (help_menu), about_item);
 	
 	/* Attach the callback functions to the activate signal */
@@ -432,6 +476,10 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (copy_item), "activate", GTK_SIGNAL_FUNC (copy_cb), (gpointer) "edit.copy");
 	gtk_signal_connect_object (GTK_OBJECT (paste_item), "activate", GTK_SIGNAL_FUNC (paste_cb), (gpointer) "edit.paste");
 	gtk_signal_connect_object (GTK_OBJECT (delete_item), "activate", GTK_SIGNAL_FUNC (delete_cb), (gpointer) "edit.delete");
+	gtk_signal_connect_object (GTK_OBJECT (find_item), "activate", GTK_SIGNAL_FUNC (find_cb), (gpointer) "edit.find");
+	gtk_signal_connect_object (GTK_OBJECT (zoom_in_item), "activate", GTK_SIGNAL_FUNC (zoom_in_cb), (gpointer) "view.zoom-in");
+	gtk_signal_connect_object (GTK_OBJECT (zoom_out_item), "activate", GTK_SIGNAL_FUNC (zoom_out_cb), (gpointer) "view.zoom-out");
+	gtk_signal_connect_object (GTK_OBJECT (zoom_reset_item), "activate", GTK_SIGNAL_FUNC (zoom_reset_cb), (gpointer) "view.zoom-reset");
 	gtk_signal_connect_object (GTK_OBJECT (settings_item), "activate", GTK_SIGNAL_FUNC (settings_cb), (gpointer) "tools.settings");
 	gtk_signal_connect_object (GTK_OBJECT (about_item), "activate", GTK_SIGNAL_FUNC (about_cb), (gpointer) "help.about");
 	
@@ -443,28 +491,36 @@ create_menubar ()
 	gtk_widget_show (copy_item);
 	gtk_widget_show (paste_item);
 	gtk_widget_show (delete_item);
+	gtk_widget_show (find_item);
+	gtk_widget_show (zoom_in_item);
+	gtk_widget_show (zoom_out_item);
+	gtk_widget_show (zoom_reset_item);
 	gtk_widget_show (settings_item);
 	gtk_widget_show (about_item);
 	
 	/* Create "File" and "Help" entries in menubar */
 	GtkWidget* file_item = gtk_menu_item_new_with_label ("File");
 	GtkWidget* edit_item = gtk_menu_item_new_with_label ("Edit");
+	GtkWidget* view_item = gtk_menu_item_new_with_label ("View");
 	GtkWidget* tools_item = gtk_menu_item_new_with_label ("Tools");
 	GtkWidget* help_item = gtk_menu_item_new_with_label ("Help");
 	gtk_widget_show (file_item);
 	gtk_widget_show (edit_item);
+	gtk_widget_show (view_item);
 	gtk_widget_show (tools_item);
 	gtk_widget_show (help_item);
 	
 	/* Associate file_menu with file_item in the menubar */
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (file_item), file_menu);
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (edit_item), edit_menu);
+	gtk_menu_item_set_submenu (GTK_MENU_ITEM (view_item), view_menu);
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (tools_item), tools_menu);
 	gtk_menu_item_set_submenu (GTK_MENU_ITEM (help_item), help_menu);
 	
 	/* Add file_menu to menu_bar */
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), file_item);
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), edit_item);
+	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), view_item);
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), tools_item);
 	gtk_menu_bar_append (GTK_MENU_BAR (menu_bar), help_item);
 	
