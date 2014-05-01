@@ -822,7 +822,9 @@ set_settings ()
  */
 int
 main (int argc, char* argv[])
-{
+{	
+	printf ("surf-"VERSION", 2014 David Luco\n");
+	
 	gtk_init (&argc, &argv);
 
 	GtkWidget* vbox = gtk_vbox_new (FALSE, 0);
