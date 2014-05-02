@@ -54,9 +54,16 @@ static engine search_engines[] = {
 static void
 activate_uri_entry_cb (GtkWidget* entry, gpointer data)
 {
-	const gchar* uri = gtk_entry_get_text (GTK_ENTRY (entry));
-	g_assert (uri);
-	webkit_web_view_open (web_view, uri);
+	const gchar* uri;
+	const gchar* temp = gtk_entry_get_text (GTK_ENTRY (entry));
+	
+	/* Append appropriate prefix */
+	if (temp[0] == '/')
+		uri = g_strdup_printf("file://%s", temp);
+	else
+		uri = g_strrstr(temp, "://") ? g_strdup(temp) : g_strdup_printf("http://%s", temp);
+	
+	webkit_web_view_load_uri (web_view, uri);
 }
 
 static void
@@ -64,7 +71,7 @@ activate_search_engine_entry_cb (GtkWidget* entry, gpointer data)
 {
 	const gchar* uri = g_strconcat (search_engines[search_engine_current].url, gtk_entry_get_text (GTK_ENTRY (entry)), NULL);
 	g_assert (uri);
-	webkit_web_view_open (web_view, uri);
+	webkit_web_view_load_uri (web_view, uri);
 }
 
 static void
@@ -257,8 +264,8 @@ openfile_cb (GtkWidget* widget, gpointer data)
 	if (gtk_dialog_run (GTK_DIALOG (file_dialog)) == GTK_RESPONSE_ACCEPT)
 	{
 		gchar *filename;
-		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_dialog));
-		webkit_web_view_open (web_view, filename);
+		filename = g_strdup_printf("file://%s", gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_dialog)));
+		webkit_web_view_load_uri (web_view, filename);
 		g_free (filename);
 	}
 	
@@ -505,9 +512,9 @@ about_cb (GtkWidget* widget, gpointer data)
 	gtk_about_dialog_set_comments (GTK_ABOUT_DIALOG (about_dialog), "A simple webkit/gtk browser, in the style of surf and midori");
 	
 	/* Set logo to display in dialog */
-	gtk_about_dialog_set_logo_icon_name (GTK_ABOUT_DIALOG (about_dialog), "browser");
+	gtk_about_dialog_set_logo_icon_name (GTK_ABOUT_DIALOG (about_dialog), "web-browser");
 	/* Set taskbar/window icon */
-	gtk_window_set_icon_name (GTK_WINDOW (about_dialog), "browser");
+	gtk_window_set_icon_name (GTK_WINDOW (about_dialog), "web-browser");
 	
 	/* Set authors, license, and website in dialog */
 	gtk_about_dialog_set_authors (GTK_ABOUT_DIALOG (about_dialog), authors);
@@ -552,7 +559,7 @@ refresh_cb (GtkWidget* widget, gpointer data)
 static void
 home_cb (GtkWidget* widget, gpointer data)
 {
-	webkit_web_view_open (web_view, home_page);
+	webkit_web_view_load_uri (web_view, home_page);
 }
 
 /*
@@ -789,7 +796,7 @@ create_window ()
 	GtkWidget* window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_window_set_default_size (GTK_WINDOW (window), 800, 600);
 	gtk_widget_set_name (window, "sb");
-	gtk_window_set_icon_name (GTK_WINDOW (window), "browser");
+	gtk_window_set_icon_name (GTK_WINDOW (window), "web-browser");
 	g_signal_connect (G_OBJECT (window), "destroy", G_CALLBACK (destroy_cb), NULL);
 
 	return window;
@@ -823,9 +830,14 @@ set_settings ()
 int
 main (int argc, char* argv[])
 {	
-	printf ("surf-"VERSION", 2014 David Luco\n");
-	
 	gtk_init (&argc, &argv);
+	
+	if (argc > 1)
+		if (argv[1][1] == 'v')
+		{
+			printf ("surf-"VERSION", 2014 David Luco\n");
+			return 0;
+		}
 
 	GtkWidget* vbox = gtk_vbox_new (FALSE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_menubar (), FALSE, FALSE, 0);
@@ -840,7 +852,7 @@ main (int argc, char* argv[])
 	search_buffer = gtk_entry_buffer_new (NULL, -1);
 	set_settings ();
 	gchar* uri = (gchar*) (argc > 1 ? argv[1] : home_page);
-	webkit_web_view_open (web_view, uri);
+	webkit_web_view_load_uri (web_view, uri);
 
 	gtk_widget_grab_focus (GTK_WIDGET (web_view));
 	gtk_widget_show_all (main_window);
