@@ -1,0 +1,8 @@
+# Ignore compiled binary file(s)
+surf
+
+# Ignore objects and archives
+*.[oa]
+
+# Ignore log file(s)
+log
