@@ -7,19 +7,22 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 
 #include "config.h"
 
 static GtkWidget* main_window;
-static GtkWidget* menu_bar;
+static GtkWidget* main_book;
+static GtkWidget* main_menu_bar;
 
 static GtkWidget* main_toolbar;
 static GtkToolItem* back_button;
 static GtkToolItem* forward_button;
 static GtkToolItem* refresh_button;
 static GtkWidget* uri_entry;
+static GtkEntryBuffer* search_buffer;
 static GtkWidget* search_engine_entry;
 
 static GtkStatusbar* main_statusbar;
@@ -28,7 +31,7 @@ static gchar* main_title;
 static gint load_progress;
 static guint status_context_id;
 
-static GtkEntryBuffer* search_buffer;
+static int user_agent_current = 0;
 static char* useragents[] = {
 	"Mozilla/5.0 (X11; U; Unix; en-US) AppleWebKit/537.15 (KHTML, like Gecko) Chrome/24.0.1295.0 Safari/537.15 sb/0.1",
 	"Mozilla/5.0 (Windows NT 5.1; rv:31.0) Gecko/20100101 Firefox/31.0",
@@ -36,6 +39,17 @@ static char* useragents[] = {
 	"Mozilla/5.0 (compatible; MSIE 10.6; Windows NT 6.1; Trident/5.0; InfoPath.2; SLCC1; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET CLR 2.0.50727) 3gpp-gba UNTRUSTED/1.0",
 	"Mozilla/5.0 (Linux; U; Android 4.0.3; ko-kr; LG-L160L Build/IML74K) AppleWebkit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
 };
+
+typedef struct Client {
+	GtkWidget *vbox, *scroll, *pane;
+	WebKitWebView* view;
+	WebKitWebInspector *inspector;
+	const char *uri;
+	gint progress;
+	gboolean zoomed, fullscreen, isinspecting;
+} Client;
+
+static Client* current_client = NULL;
 
 typedef struct engine {
 	char* name;
@@ -47,6 +61,8 @@ static engine search_engines[] = {
 	{"Google", "https://www.google.ca/#q="},
 	{"Duck Duck Go", "https://duckduckgo.com/?q="}
 };
+
+static Client* create_new_client ();
 
 /*
  * Callback for activation of the url-bar - open web page in web-view
@@ -174,6 +190,71 @@ init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer da
 	return TRUE;
 }
 
+static WebKitWebView*
+create_new_tab (WebKitWebView  *v, WebKitWebFrame *f, Client *c)
+{
+	Client* n = create_new_client ();
+	gtk_notebook_append_page (GTK_NOTEBOOK (main_book), n->pane, NULL);
+	current_client = n;
+	return n->view;
+}
+
+static WebKitWebView*
+inspector_new (WebKitWebInspector* i, WebKitWebView* v, Client* c)
+{
+	return WEBKIT_WEB_VIEW (webkit_web_view_new ());
+}
+
+static gboolean
+inspector_show (WebKitWebInspector *i, Client *c)
+{
+	WebKitWebView *w;
+
+	if (c->isinspecting)
+		return false;
+
+	w = webkit_web_inspector_get_web_view (i);
+	gtk_paned_pack2 (GTK_PANED (c->pane), GTK_WIDGET (w), TRUE, TRUE);
+	gtk_widget_show(GTK_WIDGET (w));
+	c->isinspecting = true;
+
+	return true;
+}
+
+static gboolean
+inspector_close (WebKitWebInspector *i, Client *c)
+{
+	GtkWidget *w;
+
+	if (!c->isinspecting)
+		return false;
+
+	w = GTK_WIDGET (webkit_web_inspector_get_web_view(i));
+	gtk_widget_hide (w);
+	gtk_widget_destroy (w);
+	c->isinspecting = false;
+
+	return true;
+}
+
+static void
+inspector_finished (WebKitWebInspector *i, Client *c)
+{
+	g_free (c->inspector);
+}
+
+static void
+inspector (GtkCheckMenuItem *checkmenuitem, gpointer data)
+{
+	if (gtk_check_menu_item_get_active (GTK_CHECK_MENU_ITEM (checkmenuitem)))
+	{
+		inspector_close (current_client->inspector, current_client);
+	} else
+	{
+		inspector_new (current_client->inspector, web_view, current_client);
+	}
+}
+
 /*
  * Callback for a change in the title of a web page - update window title
  */
@@ -188,12 +269,18 @@ title_change_cb (WebKitWebView* web_view, WebKitWebFrame* web_frame, const gchar
 
 /*
  * Callback for change in progress of a page being loaded - update title of window
- */
+ *
 static void
 progress_change_cb (WebKitWebView* web_view, gint progress, gpointer data)
 {
 	load_progress = progress;
 	update_title (GTK_WINDOW (main_window));
+}*/
+
+static void
+progress_change_cb (WebKitWebView *view, GParamSpec *pspec, Client *c)
+{
+	c->progress = webkit_web_view_get_progress(c->view) * 100;
 }
 
 /*
@@ -223,7 +310,6 @@ load_status_change_cb (WebKitWebView* web_view, gpointer data)
 			break;
 	}
 }
-
 
 /*
  * Callback to exit program
@@ -455,12 +541,6 @@ settings_dialog_cb (GtkWidget* widget, gpointer data)
 	gtk_box_pack_start (GTK_BOX (vbox), private_browsing_button, TRUE, TRUE, 2);
 	gtk_widget_show (private_browsing_button);
 	
-	GtkWidget* inspector_button = gtk_check_button_new_with_label ("Enable web inspector");
-	g_object_get (G_OBJECT (settings), "enable-developer-extras", &isactive, NULL);
-	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (inspector_button), isactive);
-	gtk_box_pack_start (GTK_BOX (vbox), inspector_button, TRUE, TRUE, 2);
-	gtk_widget_show (inspector_button);
-	
 	/* Combox-box to choose the useragent to use */
 	GtkWidget* combo_box = gtk_combo_box_text_new ();
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "sb (Default)");
@@ -481,9 +561,7 @@ settings_dialog_cb (GtkWidget* widget, gpointer data)
 			
 			/* Set private browsing from selection */
 			g_object_set (G_OBJECT (settings), "enable-private-browsing", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (private_browsing_button)), NULL);
-			
-			g_object_set (G_OBJECT (settings), "enable-developer-extras", gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (inspector_button)), NULL);
-			
+						
 			/* Set user-agent from selection */
 			g_object_set (G_OBJECT (settings), "user-agent", useragents[gtk_combo_box_get_active (GTK_COMBO_BOX (combo_box))], NULL);
 			webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
@@ -563,27 +641,31 @@ home_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
- * Create a webkit webview instance in a scrolled window
+ * Apply default settings to web-view
  */
-static GtkWidget*
-create_browser ()
+static void
+set_settings (WebKitWebView* web_view)
 {
-	GtkWidget* scrolled_window = gtk_scrolled_window_new (NULL, NULL);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-	web_view = WEBKIT_WEB_VIEW (webkit_web_view_new ());
+	WebKitWebSettings *settings = webkit_web_settings_new ();
 	
+	/* Apply default settings from config.h */
+	g_object_set (G_OBJECT (settings), "user-agent", useragents[user_agent_current], NULL);
+	g_object_set (G_OBJECT (settings), "auto-load-images", loadimages, NULL);
+	g_object_set (G_OBJECT (settings), "enable-plugins", enableplugins, NULL);
+	g_object_set (G_OBJECT (settings), "enable-scripts", enablescripts, NULL);
+	g_object_set (G_OBJECT (settings), "enable-spatial-navigation", enablespatialbrowsing, NULL);
+	g_object_set (G_OBJECT (settings), "enable-spell-checking", enablespellchecking, NULL);
+	g_object_set (G_OBJECT (settings), "enable-file-access-from-file-uris", TRUE, NULL);
+	g_object_set (G_OBJECT (settings), "enable-developer-extras", enableinspector, NULL);
 	
-	gtk_container_add (GTK_CONTAINER (scrolled_window), GTK_WIDGET (web_view));
-
-	g_signal_connect (G_OBJECT (web_view), "title-changed", G_CALLBACK (title_change_cb), web_view);
-	g_signal_connect (G_OBJECT (web_view), "load-progress-changed", G_CALLBACK (progress_change_cb), web_view);
-	g_signal_connect (G_OBJECT (web_view), "notify::load-status", G_CALLBACK (load_status_change_cb), web_view);
-	g_signal_connect (G_OBJECT (web_view), "hovering-over-link", G_CALLBACK (link_hover_cb), web_view);
-	g_signal_connect (G_OBJECT (web_view), "mime-type-policy-decision-requested", G_CALLBACK (decide_download_cb), web_view);
-	g_signal_connect (G_OBJECT (web_view), "download-requested", G_CALLBACK (init_download_cb), web_view);
-
-	return scrolled_window;
+	if (hidebackground)
+		webkit_web_view_set_transparent(web_view, TRUE);
+		
+	if (fullcontentzoom)
+		webkit_web_view_set_full_content_zoom(web_view, TRUE);
+	
+	/* Apply settings */
+	webkit_web_view_set_settings (WEBKIT_WEB_VIEW (web_view), settings);
 }
 
 /*
@@ -593,7 +675,7 @@ static GtkWidget*
 create_menubar ()
 {
 	/* Create menubar */
-	menu_bar = gtk_menu_bar_new ();
+	GtkWidget* menu_bar = gtk_menu_bar_new ();
 	gtk_widget_show (menu_bar);
 	
 	/* Create File, Edit, and Help Menus */
@@ -628,6 +710,7 @@ create_menubar ()
 	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_reset_item), "Reset Zoom");
 	GtkWidget* settings_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PREFERENCES, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (settings_item), "Settings");
+	GtkWidget* inspector_item = gtk_check_menu_item_new_with_label ("Inspector");
 	GtkWidget* about_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ABOUT, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (about_item), "About");
 	
@@ -649,6 +732,8 @@ create_menubar ()
 	gtk_menu_append (GTK_MENU (view_menu), zoom_reset_item);
 	
 	gtk_menu_append (GTK_MENU (tools_menu), settings_item);
+	if (enableinspector)
+		gtk_menu_append (GTK_MENU (tools_menu), inspector_item);
 	
 	gtk_menu_append (GTK_MENU (help_menu), about_item);
 	
@@ -665,6 +750,8 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (zoom_out_item), "activate", GTK_SIGNAL_FUNC (zoom_out_cb), (gpointer) "view.zoom-out");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_reset_item), "activate", GTK_SIGNAL_FUNC (zoom_reset_cb), (gpointer) "view.zoom-reset");
 	gtk_signal_connect_object (GTK_OBJECT (settings_item), "activate", GTK_SIGNAL_FUNC (settings_dialog_cb), (gpointer) "tools.settings");
+	if (enableinspector)
+		gtk_signal_connect_object (GTK_OBJECT (inspector_item), "activate", GTK_SIGNAL_FUNC (inspector), (gpointer) "tools.inspector");
 	gtk_signal_connect_object (GTK_OBJECT (about_item), "activate", GTK_SIGNAL_FUNC (about_cb), (gpointer) "help.about");
 	
 	/* Show menu items */
@@ -680,6 +767,8 @@ create_menubar ()
 	gtk_widget_show (zoom_out_item);
 	gtk_widget_show (zoom_reset_item);
 	gtk_widget_show (settings_item);
+	if (enableinspector)
+		gtk_widget_show (inspector_item);
 	gtk_widget_show (about_item);
 	
 	/* Create "File" and "Help" entries in menubar */
@@ -786,6 +875,55 @@ create_toolbar ()
 	return toolbar;
 }
 
+static Client*
+create_new_client ()
+{
+	Client* c;
+	
+	if (!(c = calloc(1, sizeof (Client))))
+		fprintf(stderr, "Cannot allocate memory for client\n");
+	
+	/* Pane, vobx, scrolled-window */
+	c->pane = gtk_vpaned_new();
+	c->vbox = gtk_vbox_new (FALSE, 0);
+	c->scroll = gtk_scrolled_window_new (NULL, NULL);
+	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (c->scroll), GTK_POLICY_NEVER, GTK_POLICY_NEVER);
+	
+	/* Setup web-view */
+	c->view = WEBKIT_WEB_VIEW (webkit_web_view_new ());
+	
+	g_signal_connect (G_OBJECT (c->view), "title-changed", G_CALLBACK (title_change_cb), c);
+	g_signal_connect (G_OBJECT (c->view), "notify::progress", G_CALLBACK (progress_change_cb), c);
+	g_signal_connect (G_OBJECT (c->view), "notify::load-status", G_CALLBACK (load_status_change_cb), c);
+	g_signal_connect (G_OBJECT (c->view), "hovering-over-link", G_CALLBACK (link_hover_cb), c);
+	g_signal_connect (G_OBJECT (c->view), "mime-type-policy-decision-requested", G_CALLBACK (decide_download_cb), c);
+	g_signal_connect (G_OBJECT (c->view), "download-requested", G_CALLBACK (init_download_cb), c);
+	g_signal_connect (G_OBJECT (c->view), "create-web-view", G_CALLBACK (create_new_tab), c);
+	
+	/* Settings */
+	set_settings (c->view);
+	
+	/* Arrangement of containers */
+	gtk_container_add (GTK_CONTAINER (c->scroll), GTK_WIDGET (c->view));
+	gtk_container_add (GTK_CONTAINER (c->vbox), c->scroll);
+	gtk_paned_pack1 (GTK_PANED (c->pane), c->vbox, TRUE, TRUE);
+	/*gtk_notebook_append_page (GTK_NOTEBOOK (main_book), c->pane, NULL);*/
+	
+	if(enableinspector)
+	{
+		c->inspector = WEBKIT_WEB_INSPECTOR (webkit_web_view_get_inspector(c->view));
+		
+		g_signal_connect(G_OBJECT(c->inspector), "inspect-web-view", G_CALLBACK(inspector_new), c);
+		g_signal_connect(G_OBJECT(c->inspector), "show-window", G_CALLBACK(inspector_show), c);
+		g_signal_connect(G_OBJECT(c->inspector), "close-window", G_CALLBACK(inspector_close), c);
+		g_signal_connect(G_OBJECT(c->inspector), "finished", G_CALLBACK(inspector_finished), c);
+		
+		c->isinspecting = FALSE;
+	}
+	
+	return c;
+}
+
 /*
  * Create the main window, set name and icon.
  * Default geometry = 800x600
@@ -803,28 +941,6 @@ create_window ()
 }
 
 /*
- * Apply default settings to web-view
- */
-static void
-set_settings ()
-{
-	WebKitWebSettings *settings = webkit_web_settings_new ();
-	
-	/* Apply default settings from config.h */
-	g_object_set (G_OBJECT (settings), "user-agent", useragents[0], NULL);
-	g_object_set (G_OBJECT (settings), "auto-load-images", loadimages, NULL);
-	g_object_set (G_OBJECT (settings), "enable-plugins", enableplugins, NULL);
-	g_object_set (G_OBJECT (settings), "enable-scripts", enablescripts, NULL);
-	g_object_set (G_OBJECT (settings), "enable-spatial-navigation", enablespatialbrowsing, NULL);
-	g_object_set (G_OBJECT (settings), "enable-spell-checking", enablespellchecking, NULL);
-	g_object_set (G_OBJECT (settings), "enable-file-access-from-file-uris", TRUE, NULL);
-	g_object_set (G_OBJECT (settings), "enable-developer-extras", enableinspector, NULL);
-	
-	/* Apply settings */
-	webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
-}
-
-/*
  * Main function of program
  */
 int
@@ -838,20 +954,30 @@ main (int argc, char* argv[])
 			printf ("surf-"VERSION", 2014 David Luco\n");
 			return 0;
 		}
-
+	
+	/* Create GtkNotebook to hold web page tabs */
+	main_book = gtk_notebook_new ();
 	GtkWidget* vbox = gtk_vbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), create_menubar (), FALSE, FALSE, 0);
+	main_menu_bar = create_menubar ();
+	gtk_box_pack_start (GTK_BOX (vbox), main_menu_bar, FALSE, FALSE, 0);
 	main_toolbar = create_toolbar ();
 	gtk_box_pack_start (GTK_BOX (vbox), main_toolbar, FALSE, FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), create_browser (), TRUE, TRUE, 0);
+	Client* c = create_new_client ();
+	web_view = c->view;
+	gtk_notebook_append_page (GTK_NOTEBOOK (main_book), c->pane, NULL);
+	current_client = c;
+	gtk_box_pack_start (GTK_BOX (vbox), main_book, TRUE, TRUE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_statusbar (), FALSE, FALSE, 0);
-
+	
 	main_window = create_window ();
 	gtk_container_add (GTK_CONTAINER (main_window), vbox);
 	
 	search_buffer = gtk_entry_buffer_new (NULL, -1);
-	set_settings ();
 	gchar* uri = (gchar*) (argc > 1 ? argv[1] : home_page);
+	
+	/* Get current web-view from notebook 
+	web_view = (WebKitWebView*)gtk_bin_get_child (GTK_BIN (gtk_notebook_get_nth_page (GTK_NOTEBOOK (main_book), gtk_notebook_get_current_page (GTK_NOTEBOOK (main_book)))));
+	*/
 	webkit_web_view_load_uri (web_view, uri);
 
 	gtk_widget_grab_focus (GTK_WIDGET (web_view));
