@@ -31,6 +31,8 @@ static gchar* main_title;
 static gint load_progress;
 static guint status_context_id;
 
+static gboolean fullscreen = FALSE;
+
 static int user_agent_current = 0;
 static char* useragents[] = {
 	"Mozilla/5.0 (X11; U; Unix; en-US) AppleWebKit/537.15 (KHTML, like Gecko) Chrome/24.0.1295.0 Safari/537.15 sb/0.1",
@@ -46,7 +48,7 @@ typedef struct Client {
 	WebKitWebInspector *inspector;
 	const char *uri;
 	gint progress;
-	gboolean zoomed, fullscreen, isinspecting;
+	gboolean zoomed, isinspecting;
 } Client;
 
 static Client* current_client = NULL;
@@ -62,7 +64,26 @@ static engine search_engines[] = {
 	{"Duck Duck Go", "https://duckduckgo.com/?q="}
 };
 
+static void activate_uri_entry_cb (GtkWidget*, gpointer);
+static void activate_search_engine_entry_cb (GtkWidget*, gpointer);
+static void choose_search_engine_dialog ();
+static void search_engine_entry_icon_cb (GtkEntry*, GtkEntryIconPosition, GdkEvent*, gpointer);
+static void update_title (GtkWindow*);
+static void link_hover_cb (WebKitWebView*, const gchar*, const gchar*, gpointer);
+static gboolean decide_download_cb (WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, gchar*,  WebKitWebPolicyDecision*, gpointer);
+static gboolean init_download_cb (WebKitWebView*, WebKitDownload*, gpointer);
+
+
 static Client* create_new_client ();
+
+/*
+ * Callback to exit program
+ */
+static void
+destroy_cb (GtkWidget* widget, gpointer data)
+{
+	gtk_main_quit ();
+}
 
 /*
  * Callback for activation of the url-bar - open web page in web-view
@@ -125,7 +146,7 @@ choose_search_engine_dialog ()
 }
 
 static void
-search_engine_entry_icon_cb (GtkEntry *entry, GtkEntryIconPosition icon_pos, GdkEvent *event, gpointer data)
+search_engine_entry_icon_cb (GtkEntry* entry, GtkEntryIconPosition icon_pos, GdkEvent* event, gpointer data)
 {
 	switch (icon_pos)
 	{
@@ -152,6 +173,17 @@ update_title (GtkWindow* window)
 	gtk_window_set_title (window, title);
 	g_free (title);
 }
+
+/*
+static void
+tab_switched_cb (GtkNotebook* notebook, gpointer page, guint page_num, gpointer data)
+{
+	web_view = (WebKitWebView*)gtk_paned_get_child1 (GTK_PANED ( (gtk_notebook_get_nth_page (GTK_NOTEBOOK (main_book), page_num))));
+	WebKitWebFrame* frame = webkit_web_view_get_main_frame (web_view);
+	const gchar* uri = webkit_web_frame_get_uri (frame);
+	if (uri)
+		gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
+}*/
 
 /*
  * Callback for hovering over a link - show in statusbar
@@ -190,11 +222,75 @@ init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer da
 	return TRUE;
 }
 
+static void
+notebook_tab_close_clicked_cb (GtkButton *button, gpointer data)
+{
+	/* Close browser if only one tab open */
+	if (gtk_notebook_get_n_pages (GTK_NOTEBOOK (main_book)) == 1)
+	{
+		destroy_cb (main_window, NULL);
+	}
+	gint page_num = gtk_notebook_page_num (GTK_NOTEBOOK (main_book), GTK_WIDGET (data));
+	gtk_notebook_remove_page (GTK_NOTEBOOK (main_book), page_num);
+}
+
+static void
+notebook_tab_close_button_style_set (GtkWidget *btn, GtkRcStyle *prev_style, gpointer data)
+{
+	gint w, h;
+
+	gtk_icon_size_lookup_for_settings(gtk_widget_get_settings(btn), GTK_ICON_SIZE_MENU, &w, &h);
+	gtk_widget_set_size_request(btn, w + 2, h + 2);
+}
+
+static GtkWidget*
+create_tab_label (Client *c, const gchar *label_text)
+{
+	GtkWidget *hbox, *label, *button, *image, *align;
+	
+	hbox = gtk_hbox_new (FALSE, 2);
+	
+	label = gtk_label_new (label_text);
+	
+	button = gtk_button_new ();
+	gtk_button_set_relief (GTK_BUTTON (button), GTK_RELIEF_NONE);
+	gtk_button_set_focus_on_click (GTK_BUTTON (button), FALSE);
+	gtk_widget_set_name (button, "sb-close-tab-button");
+		
+	image = gtk_image_new_from_stock (GTK_STOCK_CLOSE, GTK_ICON_SIZE_MENU);
+	gtk_container_add (GTK_CONTAINER (button), image);
+	
+	align = gtk_alignment_new (1.0, 0.5, 0.0, 0.0);
+	gtk_container_add (GTK_CONTAINER (align), button);
+	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
+	gtk_box_pack_start (GTK_BOX (hbox), align, TRUE, TRUE, 0);
+	
+	g_signal_connect (button, "clicked", G_CALLBACK (notebook_tab_close_clicked_cb), c->pane);
+	g_signal_connect (button, "style-set", G_CALLBACK (notebook_tab_close_button_style_set), NULL);
+	
+	gtk_widget_show_all (hbox);
+	
+	return hbox;
+}
+
 static WebKitWebView*
 create_new_tab (WebKitWebView  *v, WebKitWebFrame *f, Client *c)
 {
-	Client* n = create_new_client ();
-	gtk_notebook_append_page (GTK_NOTEBOOK (main_book), n->pane, NULL);
+	Client* n;
+	GtkWidget* hbox;
+	const gchar* label_text;
+	
+	n = create_new_client ();
+		
+	label_text = webkit_web_frame_get_name (f);
+	
+	hbox = create_tab_label (n, label_text);
+	
+	gtk_notebook_append_page (GTK_NOTEBOOK (main_book), n->pane, hbox);
+	gtk_notebook_set_tab_reorderable (GTK_NOTEBOOK (main_book), n->pane, TRUE);
+	gtk_widget_show_all (n->pane);
+	if (!openinbackground)
+		gtk_notebook_set_current_page (GTK_NOTEBOOK(main_book), gtk_notebook_get_n_pages (GTK_NOTEBOOK(main_book)) - 1);
 	current_client = n;
 	return n->view;
 }
@@ -290,7 +386,8 @@ static void
 load_status_change_cb (WebKitWebView* web_view, gpointer data)
 {
 	WebKitWebFrame* frame;
-	const gchar* uri;
+	GtkWidget* hbox;
+	const gchar *uri, *label;
 	
 	switch (webkit_web_view_get_load_status (web_view))
 	{
@@ -298,26 +395,22 @@ load_status_change_cb (WebKitWebView* web_view, gpointer data)
 			/* Update uri in entry-bar */
 			frame = webkit_web_view_get_main_frame (web_view);
 			uri = webkit_web_frame_get_uri (frame);
+			label = webkit_web_frame_get_name (frame);
 			if (uri)
 				gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
+			/* Update tab-label */
+			hbox = create_tab_label (current_client, label);
+			gtk_notebook_set_tab_label (GTK_NOTEBOOK (main_book), current_client->pane, hbox);
 			break;
 		case WEBKIT_LOAD_FINISHED:
-			/* Update buttons - back, forward */
-			gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
-			gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
 			break;
 		default:
 			break;
 	}
-}
-
-/*
- * Callback to exit program
- */
-static void
-destroy_cb (GtkWidget* widget, gpointer data)
-{
-	gtk_main_quit ();
+	
+	/* Update buttons - back, forward */
+	gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
+	gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
 }
 
 /*
@@ -506,6 +599,20 @@ static void
 zoom_reset_cb (GtkWidget* widget, gpointer data)
 {
 	webkit_web_view_set_zoom_level (web_view, 1.0);
+}
+
+static void
+fullscreen_cb (GtkWidget* widget, gpointer data)
+{
+	if (!fullscreen)
+	{
+		gtk_window_fullscreen (GTK_WINDOW (main_window));
+		fullscreen = TRUE;
+	} else
+	{
+		gtk_window_unfullscreen (GTK_WINDOW (main_window));
+		fullscreen = FALSE;
+	}
 }
 
 /*
@@ -708,6 +815,7 @@ create_menubar ()
 	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_out_item), "Zoom Out");
 	GtkWidget* zoom_reset_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_100, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_reset_item), "Reset Zoom");
+	GtkWidget* fullscreen_item = gtk_check_menu_item_new_with_label ("Fullscreen");
 	GtkWidget* settings_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PREFERENCES, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (settings_item), "Settings");
 	GtkWidget* inspector_item = gtk_check_menu_item_new_with_label ("Inspector");
@@ -730,6 +838,7 @@ create_menubar ()
 	gtk_menu_append (GTK_MENU (view_menu), zoom_in_item);
 	gtk_menu_append (GTK_MENU (view_menu), zoom_out_item);
 	gtk_menu_append (GTK_MENU (view_menu), zoom_reset_item);
+	gtk_menu_append (GTK_MENU (view_menu), fullscreen_item);
 	
 	gtk_menu_append (GTK_MENU (tools_menu), settings_item);
 	if (enableinspector)
@@ -749,6 +858,7 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (zoom_in_item), "activate", GTK_SIGNAL_FUNC (zoom_in_cb), (gpointer) "view.zoom-in");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_out_item), "activate", GTK_SIGNAL_FUNC (zoom_out_cb), (gpointer) "view.zoom-out");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_reset_item), "activate", GTK_SIGNAL_FUNC (zoom_reset_cb), (gpointer) "view.zoom-reset");
+	gtk_signal_connect_object (GTK_OBJECT (fullscreen_item), "activate", GTK_SIGNAL_FUNC (fullscreen_cb), (gpointer) "view.fullscreen");
 	gtk_signal_connect_object (GTK_OBJECT (settings_item), "activate", GTK_SIGNAL_FUNC (settings_dialog_cb), (gpointer) "tools.settings");
 	if (enableinspector)
 		gtk_signal_connect_object (GTK_OBJECT (inspector_item), "activate", GTK_SIGNAL_FUNC (inspector), (gpointer) "tools.inspector");
@@ -766,6 +876,7 @@ create_menubar ()
 	gtk_widget_show (zoom_in_item);
 	gtk_widget_show (zoom_out_item);
 	gtk_widget_show (zoom_reset_item);
+	gtk_widget_show (fullscreen_item);
 	gtk_widget_show (settings_item);
 	if (enableinspector)
 		gtk_widget_show (inspector_item);
@@ -913,15 +1024,25 @@ create_new_client ()
 	{
 		c->inspector = WEBKIT_WEB_INSPECTOR (webkit_web_view_get_inspector(c->view));
 		
-		g_signal_connect(G_OBJECT(c->inspector), "inspect-web-view", G_CALLBACK(inspector_new), c);
-		g_signal_connect(G_OBJECT(c->inspector), "show-window", G_CALLBACK(inspector_show), c);
-		g_signal_connect(G_OBJECT(c->inspector), "close-window", G_CALLBACK(inspector_close), c);
-		g_signal_connect(G_OBJECT(c->inspector), "finished", G_CALLBACK(inspector_finished), c);
+		g_signal_connect (G_OBJECT (c->inspector), "inspect-web-view", G_CALLBACK (inspector_new), c);
+		g_signal_connect (G_OBJECT (c->inspector), "show-window", G_CALLBACK (inspector_show), c);
+		g_signal_connect (G_OBJECT (c->inspector), "close-window", G_CALLBACK (inspector_close), c);
+		g_signal_connect (G_OBJECT (c->inspector), "finished", G_CALLBACK (inspector_finished), c);
 		
 		c->isinspecting = FALSE;
 	}
 	
 	return c;
+}
+
+static GtkWidget*
+create_notebook ()
+{
+	GtkWidget* notebook = gtk_notebook_new ();
+	gtk_notebook_popup_enable (GTK_NOTEBOOK (notebook));
+	/*g_signal_connect (G_OBJECT (notebook), "switch-page", G_CALLBACK (tab_switched_cb), NULL);*/
+	
+	return notebook;
 }
 
 /*
@@ -956,7 +1077,7 @@ main (int argc, char* argv[])
 		}
 	
 	/* Create GtkNotebook to hold web page tabs */
-	main_book = gtk_notebook_new ();
+	main_book = create_notebook ();
 	GtkWidget* vbox = gtk_vbox_new (FALSE, 0);
 	main_menu_bar = create_menubar ();
 	gtk_box_pack_start (GTK_BOX (vbox), main_menu_bar, FALSE, FALSE, 0);
@@ -965,6 +1086,7 @@ main (int argc, char* argv[])
 	Client* c = create_new_client ();
 	web_view = c->view;
 	gtk_notebook_append_page (GTK_NOTEBOOK (main_book), c->pane, NULL);
+	gtk_notebook_set_tab_reorderable (GTK_NOTEBOOK (main_book), c->pane, TRUE);
 	current_client = c;
 	gtk_box_pack_start (GTK_BOX (vbox), main_book, TRUE, TRUE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_statusbar (), FALSE, FALSE, 0);
