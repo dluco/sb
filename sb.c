@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
 #include <webkit/webkit.h>
 
 #include "config.h"
@@ -28,9 +29,10 @@ static gchar* main_title;
 static gint load_progress;
 static guint status_context_id;
 
+static GtkAccelGroup *accel_group = NULL;
 static gboolean fullscreen = FALSE;
 
-static GtkEntryBuffer* search_buffer;
+static GtkEntryBuffer* find_buffer;
 static char* useragents[] = {
 	"Mozilla/5.0 (X11; U; Unix; en-US) AppleWebKit/537.15 (KHTML, like Gecko) Chrome/24.0.1295.0 Safari/537.15 sb/0.1",
 	"Mozilla/5.0 (Windows NT 5.1; rv:31.0) Gecko/20100101 Firefox/31.0",
@@ -79,7 +81,11 @@ activate_search_engine_entry_cb (GtkWidget* entry, gpointer data)
 static void
 choose_search_engine_dialog ()
 {
-	GtkWidget* dialog = gtk_dialog_new_with_buttons ("Engine...",
+	GtkWidget *dialog;
+	GtkWidget *vbox;
+	GtkWidget *combo_box;
+	
+	dialog = gtk_dialog_new_with_buttons ("Engine...",
 													GTK_WINDOW (main_window),
 													GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
 													GTK_STOCK_CANCEL,
@@ -88,9 +94,9 @@ choose_search_engine_dialog ()
 													GTK_RESPONSE_ACCEPT,
 													NULL);
 													
-	GtkWidget* vbox = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+	vbox = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
 	
-	GtkWidget* combo_box = gtk_combo_box_text_new ();
+	combo_box = gtk_combo_box_text_new ();
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Google");
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Duck Duck Go");
 	gtk_combo_box_set_active (GTK_COMBO_BOX (combo_box), search_engine_current);
@@ -242,7 +248,11 @@ destroy_cb (GtkWidget* widget, gpointer data)
 static void
 openfile_cb (GtkWidget* widget, gpointer data)
 {
-	GtkWidget* file_dialog = gtk_file_chooser_dialog_new ("Open File",
+	GtkWidget* file_dialog;
+	GtkFileFilter* filter;
+	gchar *filename;
+	
+	file_dialog = gtk_file_chooser_dialog_new ("Open File",
 														GTK_WINDOW (main_window),
 														GTK_FILE_CHOOSER_ACTION_OPEN,
 														"Cancel", GTK_RESPONSE_CANCEL,
@@ -250,7 +260,7 @@ openfile_cb (GtkWidget* widget, gpointer data)
 														NULL);
 	
 	/* Add filters to dialog - all and html files */
-	GtkFileFilter* filter = gtk_file_filter_new ();
+	filter = gtk_file_filter_new ();
 	gtk_file_filter_set_name (filter, "All files");
 	gtk_file_filter_add_pattern (filter, "*");
 	gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (file_dialog), filter);
@@ -265,7 +275,6 @@ openfile_cb (GtkWidget* widget, gpointer data)
 	/* Run the dialog and check result. If a file was selected, open it in the web-view. */							
 	if (gtk_dialog_run (GTK_DIALOG (file_dialog)) == GTK_RESPONSE_ACCEPT)
 	{
-		gchar *filename;
 		filename = g_strdup_printf("file://%s", gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (file_dialog)));
 		webkit_web_view_load_uri (web_view, filename);
 		g_free (filename);
@@ -288,8 +297,17 @@ print_cb (GtkWidget* widget, gpointer data)
  */
 static void
 cut_cb (GtkWidget* widget, gpointer data)
-{
-	webkit_web_view_cut_clipboard (web_view);
+{	
+	if (gtk_widget_has_focus (uri_entry))
+	{
+		g_signal_emit_by_name (uri_entry, "cut-clipboard");
+	} else if (gtk_widget_has_focus (search_engine_entry))
+	{
+		g_signal_emit_by_name (search_engine_entry, "cut-clipboard");
+	} else if (TRUE)
+	{
+		webkit_web_view_cut_clipboard (web_view);
+	}
 }
 
 /*
@@ -297,8 +315,17 @@ cut_cb (GtkWidget* widget, gpointer data)
  */
 static void
 copy_cb (GtkWidget* widget, gpointer data)
-{
-	webkit_web_view_copy_clipboard (web_view);
+{	
+	if (gtk_widget_has_focus (uri_entry))
+	{
+		g_signal_emit_by_name (uri_entry, "copy-clipboard");
+	} else if (gtk_widget_has_focus (search_engine_entry))
+	{
+		g_signal_emit_by_name (search_engine_entry, "copy-clipboard");
+	} else if (TRUE)
+	{
+		webkit_web_view_copy_clipboard (web_view);
+	}
 }
 
 /*
@@ -307,7 +334,16 @@ copy_cb (GtkWidget* widget, gpointer data)
 static void
 paste_cb (GtkWidget* widget, gpointer data)
 {
-	webkit_web_view_paste_clipboard (web_view);
+	if (gtk_widget_has_focus (uri_entry))
+	{
+		g_signal_emit_by_name (uri_entry, "paste-clipboard");
+	} else if (gtk_widget_has_focus (search_engine_entry))
+	{
+		g_signal_emit_by_name (search_engine_entry, "paste-clipboard");
+	} else if (TRUE)
+	{
+		webkit_web_view_paste_clipboard (web_view);
+	}
 }
 
 /* 
@@ -315,8 +351,17 @@ paste_cb (GtkWidget* widget, gpointer data)
  */
 static void
 delete_cb (GtkWidget* widget, gpointer data)
-{
-	webkit_web_view_delete_selection (web_view);
+{	
+	if (gtk_widget_has_focus (uri_entry))
+	{
+		g_signal_emit_by_name (uri_entry, "delete-from-cursor");
+	} else if (gtk_widget_has_focus (search_engine_entry))
+	{
+		g_signal_emit_by_name (search_engine_entry, "delete-from-cursor");
+	} else if (TRUE)
+	{
+		webkit_web_view_delete_selection (web_view);
+	}
 }
 
 /*
@@ -325,7 +370,17 @@ delete_cb (GtkWidget* widget, gpointer data)
 static void
 find_dialog_cb (GtkWidget* widget, gpointer data)
 {
-	GtkWidget* dialog = gtk_dialog_new_with_buttons ("Find",
+	GtkWidget *dialog;
+	GtkWidget *content_area;
+	GtkWidget *find_button;
+	GtkWidget *hbox;
+	GtkWidget *label;
+	GtkWidget *find_entry;
+	GtkWidget *case_button;
+	GtkWidget *find_forward_button;
+	GtkWidget *wrap_button;
+	
+	dialog = gtk_dialog_new_with_buttons ("Find",
 													GTK_WINDOW (main_window),
 													GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
 													GTK_STOCK_CANCEL,
@@ -335,19 +390,19 @@ find_dialog_cb (GtkWidget* widget, gpointer data)
 													NULL);
 	
 	/* Get area for entry and toggles, and get the find button */
-	GtkWidget* content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
-	GtkWidget* find_button = gtk_dialog_get_widget_for_response (GTK_DIALOG (dialog), GTK_RESPONSE_ACCEPT);
+	content_area = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+	find_button = gtk_dialog_get_widget_for_response (GTK_DIALOG (dialog), GTK_RESPONSE_ACCEPT);
 	
 	/* Set "Find" button as default button */
 	gtk_widget_set_can_default (find_button, TRUE);
 	gtk_widget_grab_default (find_button);
 	
 	/* Create a hbox to hold label and entry */
-	GtkWidget* hbox = gtk_hbox_new (FALSE, 0);
-	GtkWidget* label = gtk_label_new ("Find what:");
+	hbox = gtk_hbox_new (FALSE, 0);
+	label = gtk_label_new ("Find what:");
 	
 	/* Set up entry - entry activation activates the find button as well */
-	GtkWidget* find_entry = gtk_entry_new_with_buffer (GTK_ENTRY_BUFFER (search_buffer));
+	find_entry = gtk_entry_new_with_buffer (GTK_ENTRY_BUFFER (find_buffer));
 	gtk_entry_set_activates_default (GTK_ENTRY (find_entry), TRUE);
 	
 	/* Pack label and entry into hbox */
@@ -358,14 +413,14 @@ find_dialog_cb (GtkWidget* widget, gpointer data)
 	gtk_box_pack_start (GTK_BOX (content_area), hbox, FALSE, FALSE, 5);
 	
 	/* Set up toggles for matching case, searching forward, and wrapping the search */
-	GtkWidget* case_button = gtk_check_button_new_with_label ("Match case");
+	case_button = gtk_check_button_new_with_label ("Match case");
 	gtk_box_pack_start (GTK_BOX (content_area), case_button, FALSE, FALSE, 5);
 	
-	GtkWidget* find_forward_button = gtk_check_button_new_with_label ("Search forward");
+	find_forward_button = gtk_check_button_new_with_label ("Search forward");
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (find_forward_button), TRUE);
 	gtk_box_pack_start (GTK_BOX (content_area), find_forward_button, FALSE, FALSE, 5);
 	
-	GtkWidget* wrap_button = gtk_check_button_new_with_label ("Wrap search");
+	wrap_button = gtk_check_button_new_with_label ("Wrap search");
 	gtk_box_pack_start (GTK_BOX (content_area), wrap_button, FALSE, FALSE, 5);
 	
 	/* Show all widgets */
@@ -395,6 +450,12 @@ find_dialog_cb (GtkWidget* widget, gpointer data)
 
 	/* Destroy the dialog */
 	gtk_widget_destroy (dialog);
+}
+
+static void
+find_next_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_search_text (web_view, gtk_entry_buffer_get_text (find_buffer), FALSE, TRUE, TRUE);
 }
 
 /*
@@ -444,7 +505,15 @@ fullscreen_cb (GtkWidget* widget, gpointer data)
 static void
 settings_dialog_cb (GtkWidget* widget, gpointer data)
 {
-	GtkWidget* dialog = gtk_dialog_new_with_buttons ("sb Settings",
+	GtkWidget *dialog;
+	GtkWidget *vbox;
+	WebKitWebSettings *settings;
+	GtkWidget *smooth_scrolling_button;
+	GtkWidget *private_browsing_button;
+	GtkWidget *inspector_button;
+	GtkWidget *combo_box;
+	
+	dialog = gtk_dialog_new_with_buttons ("sb Settings",
 													GTK_WINDOW (main_window),
 													GTK_DIALOG_DESTROY_WITH_PARENT,
 													GTK_STOCK_CANCEL,
@@ -453,32 +522,32 @@ settings_dialog_cb (GtkWidget* widget, gpointer data)
 													GTK_RESPONSE_ACCEPT,
 													NULL);
 	
-	GtkWidget* vbox = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
-	WebKitWebSettings* settings = webkit_web_view_get_settings (web_view);
+	vbox = gtk_dialog_get_content_area (GTK_DIALOG (dialog));
+	settings = webkit_web_view_get_settings (web_view);
 	gboolean isactive = FALSE;
 	
 	/* Check-button to control smooth-scrolling */
-	GtkWidget* smooth_scrolling_button = gtk_check_button_new_with_label ("Enable smooth-scrolling");
+	smooth_scrolling_button = gtk_check_button_new_with_label ("Enable smooth-scrolling");
 	g_object_get (G_OBJECT (settings), "enable-smooth-scrolling", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (smooth_scrolling_button), isactive);
 	gtk_box_pack_start (GTK_BOX (vbox), smooth_scrolling_button, TRUE, TRUE, 2);
 	gtk_widget_show (smooth_scrolling_button);
 	
 	/* Check-button to control private browsing */
-	GtkWidget* private_browsing_button = gtk_check_button_new_with_label ("Enable private browsing");
+	private_browsing_button = gtk_check_button_new_with_label ("Enable private browsing");
 	g_object_get (G_OBJECT (settings), "enable-private-browsing", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (private_browsing_button), isactive);
 	gtk_box_pack_start (GTK_BOX (vbox), private_browsing_button, TRUE, TRUE, 2);
 	gtk_widget_show (private_browsing_button);
 	
-	GtkWidget* inspector_button = gtk_check_button_new_with_label ("Enable web inspector");
+	inspector_button = gtk_check_button_new_with_label ("Enable web inspector");
 	g_object_get (G_OBJECT (settings), "enable-developer-extras", &isactive, NULL);
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (inspector_button), isactive);
 	gtk_box_pack_start (GTK_BOX (vbox), inspector_button, TRUE, TRUE, 2);
 	gtk_widget_show (inspector_button);
 	
 	/* Combox-box to choose the useragent to use */
-	GtkWidget* combo_box = gtk_combo_box_text_new ();
+	combo_box = gtk_combo_box_text_new ();
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "sb (Default)");
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Firefox");
 	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (combo_box), "Chrome");
@@ -519,6 +588,7 @@ settings_dialog_cb (GtkWidget* widget, gpointer data)
 static void
 about_cb (GtkWidget* widget, gpointer data)
 {
+	
 	GtkWidget* about_dialog = gtk_about_dialog_new ();
 	
 	const gchar *authors[] = {"David Luco", "<dluco11@gmail.com>", NULL};
@@ -644,7 +714,6 @@ create_browser ()
 
 	web_view = WEBKIT_WEB_VIEW (webkit_web_view_new ());
 	
-	
 	gtk_container_add (GTK_CONTAINER (scrolled_window), GTK_WIDGET (web_view));
 
 	g_signal_connect (G_OBJECT (web_view), "title-changed", G_CALLBACK (title_change_cb), web_view);
@@ -663,45 +732,90 @@ create_browser ()
 static GtkWidget*
 create_menubar ()
 {
+	GtkWidget *file_menu;
+	GtkWidget *edit_menu;
+	GtkWidget *view_menu;
+	GtkWidget *tools_menu;
+	GtkWidget *help_menu;
+	GtkWidget *open_item;
+	GtkWidget *print_item;
+	GtkWidget *quit_item;
+	GtkWidget *cut_item;
+	GtkWidget *copy_item;
+	GtkWidget *paste_item;
+	GtkWidget *delete_item;
+	GtkWidget *find_item;
+	GtkWidget *find_next_item;
+	GtkWidget *zoom_in_item;
+	GtkWidget *zoom_out_item;
+	GtkWidget *zoom_reset_item;
+	GtkWidget *fullscreen_item;
+	GtkWidget *settings_item;
+	GtkWidget *about_item;
+	GtkWidget *file_item;
+	GtkWidget *edit_item;
+	GtkWidget *view_item;
+	GtkWidget *tools_item;
+	GtkWidget *help_item;
+	
 	/* Create menubar */
 	menu_bar = gtk_menu_bar_new ();
 	gtk_widget_show (menu_bar);
 	
 	/* Create File, Edit, and Help Menus */
-	GtkWidget* file_menu = gtk_menu_new ();
-	GtkWidget* edit_menu = gtk_menu_new ();
-	GtkWidget* view_menu = gtk_menu_new ();
-	GtkWidget* tools_menu = gtk_menu_new ();
-	GtkWidget* help_menu = gtk_menu_new ();
+	file_menu = gtk_menu_new ();
+	edit_menu = gtk_menu_new ();
+	view_menu = gtk_menu_new ();
+	tools_menu = gtk_menu_new ();
+	help_menu = gtk_menu_new ();
 	
 	/* Create the menu items (and set icons) */
-	GtkWidget* open_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_OPEN, NULL);
+	open_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_OPEN, accel_group);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (open_item), "Open");
-	GtkWidget* print_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PRINT, NULL);
+	print_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PRINT, accel_group);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (print_item), "Print");
-	GtkWidget* quit_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_QUIT, NULL);
+	quit_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_QUIT, accel_group);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (quit_item), "Quit");
-	GtkWidget* cut_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_CUT, NULL);
+	cut_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_CUT, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (cut_item), "Cut");
-	GtkWidget* copy_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_COPY, NULL);
+	copy_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_COPY, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (copy_item), "Copy");
-	GtkWidget* paste_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PASTE, NULL);
+	paste_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PASTE, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (paste_item), "Paste");
-	GtkWidget* delete_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_DELETE, NULL);
+	delete_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_DELETE, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (delete_item), "Delete");
-	GtkWidget* find_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_FIND, NULL);
+	find_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_FIND, accel_group);
+	find_next_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_GO_FORWARD, accel_group);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (find_item), "Find...");
-	GtkWidget* zoom_in_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_IN, NULL);
+	zoom_in_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_IN, accel_group);
+	gtk_menu_item_set_label (GTK_MENU_ITEM (find_next_item), "Find Next");
 	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_in_item), "Zoom In");
-	GtkWidget* zoom_out_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_OUT, NULL);
+	zoom_out_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_OUT, accel_group);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_out_item), "Zoom Out");
-	GtkWidget* zoom_reset_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_100, NULL);
+	zoom_reset_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ZOOM_100, accel_group);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (zoom_reset_item), "Reset Zoom");
-	GtkWidget* fullscreen_item = gtk_check_menu_item_new_with_label ("Fullscreen");
-	GtkWidget* settings_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PREFERENCES, NULL);
+	fullscreen_item = gtk_check_menu_item_new_with_label ("Fullscreen");
+	settings_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_PREFERENCES, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (settings_item), "Settings");
-	GtkWidget* about_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ABOUT, NULL);
+	about_item = gtk_image_menu_item_new_from_stock (GTK_STOCK_ABOUT, NULL);
 	gtk_menu_item_set_label (GTK_MENU_ITEM (about_item), "About");
+	
+	/* Set up accelerators */
+	gtk_widget_add_accelerator (open_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_o, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (print_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_p, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (quit_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	
+	gtk_widget_add_accelerator (cut_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_x, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (copy_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_c, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (paste_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_v, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (delete_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_m, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (find_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_f, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (find_next_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_g, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	
+	gtk_widget_add_accelerator (zoom_in_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_plus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (zoom_out_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_minus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (zoom_reset_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_0, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (fullscreen_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_KEY_F11, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	
 	/* Add them to the appropriate menu */
 	gtk_menu_append (GTK_MENU (file_menu), open_item);
@@ -715,6 +829,7 @@ create_menubar ()
 	gtk_menu_append (GTK_MENU (edit_menu), delete_item);
 	gtk_menu_append (GTK_MENU (edit_menu), gtk_separator_menu_item_new ());
 	gtk_menu_append (GTK_MENU (edit_menu), find_item);
+	gtk_menu_append (GTK_MENU (edit_menu), find_next_item);
 	
 	gtk_menu_append (GTK_MENU (view_menu), zoom_in_item);
 	gtk_menu_append (GTK_MENU (view_menu), zoom_out_item);
@@ -735,6 +850,7 @@ create_menubar ()
 	gtk_signal_connect_object (GTK_OBJECT (paste_item), "activate", GTK_SIGNAL_FUNC (paste_cb), (gpointer) "edit.paste");
 	gtk_signal_connect_object (GTK_OBJECT (delete_item), "activate", GTK_SIGNAL_FUNC (delete_cb), (gpointer) "edit.delete");
 	gtk_signal_connect_object (GTK_OBJECT (find_item), "activate", GTK_SIGNAL_FUNC (find_dialog_cb), (gpointer) "edit.find");
+	gtk_signal_connect_object (GTK_OBJECT (find_next_item), "activate", GTK_SIGNAL_FUNC (find_next_cb), (gpointer) "edit.find-next");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_in_item), "activate", GTK_SIGNAL_FUNC (zoom_in_cb), (gpointer) "view.zoom-in");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_out_item), "activate", GTK_SIGNAL_FUNC (zoom_out_cb), (gpointer) "view.zoom-out");
 	gtk_signal_connect_object (GTK_OBJECT (zoom_reset_item), "activate", GTK_SIGNAL_FUNC (zoom_reset_cb), (gpointer) "view.zoom-reset");
@@ -751,6 +867,7 @@ create_menubar ()
 	gtk_widget_show (paste_item);
 	gtk_widget_show (delete_item);
 	gtk_widget_show (find_item);
+	gtk_widget_show (find_next_item);
 	gtk_widget_show (zoom_in_item);
 	gtk_widget_show (zoom_out_item);
 	gtk_widget_show (zoom_reset_item);
@@ -759,11 +876,11 @@ create_menubar ()
 	gtk_widget_show (about_item);
 	
 	/* Create "File" and "Help" entries in menubar */
-	GtkWidget* file_item = gtk_menu_item_new_with_label ("File");
-	GtkWidget* edit_item = gtk_menu_item_new_with_label ("Edit");
-	GtkWidget* view_item = gtk_menu_item_new_with_label ("View");
-	GtkWidget* tools_item = gtk_menu_item_new_with_label ("Tools");
-	GtkWidget* help_item = gtk_menu_item_new_with_label ("Help");
+	file_item = gtk_menu_item_new_with_label ("File");
+	edit_item = gtk_menu_item_new_with_label ("Edit");
+	view_item = gtk_menu_item_new_with_label ("View");
+	tools_item = gtk_menu_item_new_with_label ("Tools");
+	help_item = gtk_menu_item_new_with_label ("Help");
 	gtk_widget_show (file_item);
 	gtk_widget_show (edit_item);
 	gtk_widget_show (view_item);
@@ -808,7 +925,11 @@ create_statusbar ()
 static GtkWidget*
 create_toolbar ()
 {
-	GtkWidget* toolbar = gtk_toolbar_new ();
+	GtkWidget *toolbar;
+	GtkToolItem *item;
+	GtkWidget *h_paned;
+	
+	toolbar = gtk_toolbar_new ();
 
 	gtk_toolbar_set_orientation (GTK_TOOLBAR (toolbar), GTK_ORIENTATION_HORIZONTAL);
 	gtk_toolbar_set_style (GTK_TOOLBAR (toolbar), GTK_TOOLBAR_BOTH_HORIZ);
@@ -830,8 +951,6 @@ create_toolbar ()
 	gtk_widget_set_tooltip_text (GTK_WIDGET (refresh_button), "Reload the current page");
 	g_signal_connect (G_OBJECT (refresh_button), "clicked", G_CALLBACK (refresh_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), GTK_TOOL_ITEM (refresh_button), -1);
-	
-	GtkToolItem* item;
 
 	/* The URL entry */
 	uri_entry = gtk_entry_new ();
@@ -847,7 +966,7 @@ create_toolbar ()
 	g_signal_connect (G_OBJECT (search_engine_entry), "icon-press", G_CALLBACK (search_engine_entry_icon_cb), NULL);
 
 	/* Paned widget to hold uri entry and search-engine entry */
-	GtkWidget* h_paned = gtk_hpaned_new ();
+	h_paned = gtk_hpaned_new ();
 	gtk_paned_pack1 (GTK_PANED (h_paned), uri_entry, TRUE, TRUE);
 	gtk_paned_pack2 (GTK_PANED (h_paned), search_engine_entry, FALSE, TRUE);
 	
@@ -861,6 +980,9 @@ create_toolbar ()
 	gtk_widget_set_tooltip_text (GTK_WIDGET (item), "Go to home page");
 	g_signal_connect (G_OBJECT (item), "clicked", G_CALLBACK (home_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), item, -1);
+	
+	/* Set up accelerators (keyboard shortcuts)
+	gtk_widget_add_accelerator (GTK_WIDGET (back_button), "activate", accel_group, GDK_s, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE); */
 	
 	/* Set up right-click context menu */
 	g_signal_connect (GTK_OBJECT (toolbar), "button-press-event", G_CALLBACK (context_menu_cb), NULL);
@@ -912,6 +1034,8 @@ set_settings ()
 int
 main (int argc, char* argv[])
 {	
+	GtkWidget *vbox;
+	
 	gtk_init (&argc, &argv);
 	
 	if (argc > 1)
@@ -920,18 +1044,22 @@ main (int argc, char* argv[])
 			printf ("surf-"VERSION", 2014 David Luco\n");
 			return 0;
 		}
-
-	GtkWidget* vbox = gtk_vbox_new (FALSE, 0);
+		
+	main_window = create_window ();
+	
+	accel_group = gtk_accel_group_new ();
+	gtk_window_add_accel_group (GTK_WINDOW (main_window), accel_group);
+	
+	vbox = gtk_vbox_new (FALSE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_menubar (), FALSE, FALSE, 0);
 	main_toolbar = create_toolbar ();
 	gtk_box_pack_start (GTK_BOX (vbox), main_toolbar, FALSE, FALSE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_browser (), TRUE, TRUE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_statusbar (), FALSE, FALSE, 0);
 
-	main_window = create_window ();
 	gtk_container_add (GTK_CONTAINER (main_window), vbox);
 	
-	search_buffer = gtk_entry_buffer_new (NULL, -1);
+	find_buffer = gtk_entry_buffer_new (NULL, -1);
 	set_settings ();
 	gchar* uri = (gchar*) (argc > 1 ? argv[1] : home_page);
 	webkit_web_view_load_uri (web_view, uri);
