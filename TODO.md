@@ -1,5 +1,4 @@
 TODO
 ==
 
-- set up right-click menus (context)
-- move declarations to beginning of functions
+- move menu and toolbar functions to separate files
