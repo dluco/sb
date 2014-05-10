@@ -808,14 +808,14 @@ create_menubar ()
 	gtk_widget_add_accelerator (cut_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_x, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	gtk_widget_add_accelerator (copy_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_c, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	gtk_widget_add_accelerator (paste_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_v, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
-	gtk_widget_add_accelerator (delete_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_m, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (delete_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_Delete, 0, GTK_ACCEL_VISIBLE);
 	gtk_widget_add_accelerator (find_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_f, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	gtk_widget_add_accelerator (find_next_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_g, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	
 	gtk_widget_add_accelerator (zoom_in_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_plus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	gtk_widget_add_accelerator (zoom_out_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_minus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 	gtk_widget_add_accelerator (zoom_reset_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_0, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
-	gtk_widget_add_accelerator (fullscreen_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_KEY_F11, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
+	gtk_widget_add_accelerator (fullscreen_item, "activate", GTK_ACCEL_GROUP (accel_group),  GDK_F11, 0, GTK_ACCEL_VISIBLE);
 	
 	/* Add them to the appropriate menu */
 	gtk_menu_append (GTK_MENU (file_menu), open_item);
