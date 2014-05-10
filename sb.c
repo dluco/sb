@@ -1024,6 +1024,12 @@ set_settings ()
 	g_object_set (G_OBJECT (settings), "enable-file-access-from-file-uris", TRUE, NULL);
 	g_object_set (G_OBJECT (settings), "enable-developer-extras", enableinspector, NULL);
 	
+	if (hidebackground)
+		webkit_web_view_set_transparent(web_view, TRUE);
+		
+	if (fullcontentzoom)
+		webkit_web_view_set_full_content_zoom(web_view, TRUE);
+	
 	/* Apply settings */
 	webkit_web_view_set_settings (WEBKIT_WEB_VIEW(web_view), settings);
 }

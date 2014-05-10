@@ -15,6 +15,5 @@ static gboolean enablescripts = TRUE;
 static gboolean enableinspector = TRUE;
 static gboolean loadimages = TRUE;
 static gboolean enablespellchecking = TRUE;
-/*static gboolean hidebackground  = FALSE;
+static gboolean hidebackground  = FALSE;
 static gboolean fullcontentzoom = TRUE;
-static gboolean openinbackground = FALSE;*/
