@@ -10,6 +10,7 @@ INCLUDE=/usr/include
 LIB=/usr/lib
 
 SRC=sb.c
+OBJ=${SRC:.c=.o}
 
 all: sb
 
@@ -19,12 +20,19 @@ options:
 	@echo "LDFLAGS  = ${LDFLAGS}"
 	@echo "CC       = ${CC}"
 
-sb: config.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -I $(INCLUDE) -L $(LIB) ${SRC} -o sb
+.c.o:
+	@echo CC $<
+	@${CC} -c ${CFLAGS} $<
+
+${OBJ}: config.h
+
+sb: ${OBJ}
+	@echo CC -o $@
+	@${CC} -o $@ ${OBJ} ${LDFLAGS}
 
 clean:
 	@echo cleaning
-	@rm -rf sb sb-${VERSION}.tar.gz
+	@rm -rf sb ${OBJ} sb-${VERSION}.tar.gz
 
 dist: clean
 	@echo creating dist tarball
