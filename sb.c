@@ -179,6 +179,7 @@ init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer da
 {
 	const gchar* uri = g_strconcat ("file://", download_dir, webkit_download_get_suggested_filename (download), NULL);
 	webkit_download_set_destination_uri (download, uri);
+	
 	return TRUE;
 }
 
@@ -612,37 +613,47 @@ about_cb (GtkWidget* widget, gpointer data)
 	gtk_widget_destroy (about_dialog);
 }
 
+/*
+ * Hide or show a widget based on its current visibility
+ */
 static void
-hide_menu_bar_cb (GtkWidget *widget, gpointer data)
+hide_item_cb (GtkWidget *widget, gpointer data)
 {
-	if (gtk_widget_get_visible (menu_bar) == TRUE)
+	/*data = GTK_WIDGET (data) */
+	
+	if (gtk_widget_get_visible (data) == TRUE)
 	{
-		gtk_widget_hide (menu_bar);
+		gtk_widget_hide (data);
 		return;
 	}
-	gtk_widget_show (menu_bar);
+	gtk_widget_show (data);
 	return;
 }
 
 /*
- * Display context menu for menubar
+ * Display context menu for menubar and statusbar visibility
  */
 static void
 view_context_menu (GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
 	GtkWidget *menu;
 	GtkWidget *hide_menu_bar_item;
+	GtkWidget *hide_status_bar_item;
 	
 	menu = gtk_menu_new ();
 
 	hide_menu_bar_item = gtk_check_menu_item_new_with_label ("Menu Bar");
+	hide_status_bar_item = gtk_check_menu_item_new_with_label ("Status Bar");
 	
 	/* Set initial state of toggle to show if menubar is visible */
 	gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (hide_menu_bar_item), gtk_widget_get_visible (menu_bar));
+	gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (hide_status_bar_item), gtk_widget_get_visible (GTK_WIDGET (main_statusbar)));
 	
-	g_signal_connect (hide_menu_bar_item, "activate", G_CALLBACK (hide_menu_bar_cb), data);
+	g_signal_connect (hide_menu_bar_item, "activate", G_CALLBACK (hide_item_cb), menu_bar);
+	g_signal_connect (hide_status_bar_item, "activate", G_CALLBACK (hide_item_cb), main_statusbar);
 	
 	gtk_menu_shell_append (GTK_MENU_SHELL (menu), hide_menu_bar_item);
+	gtk_menu_shell_append (GTK_MENU_SHELL (menu), hide_status_bar_item);
 	
 	gtk_widget_show_all (menu);
 	

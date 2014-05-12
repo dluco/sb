@@ -1,5 +1,5 @@
 pkgname=sb
-pkgver=0.1
+pkgver=0.2
 pkgrel=1
 pkgdesc='A simple webkit/gtk browser, in the style of surf and midori'
 arch=('i686' 'x86_64')
@@ -8,7 +8,7 @@ license=('MIT')
 depends=('gtk2' 'libwebkit')
 makedepends=('pkgconfig')
 source=("${pkgname}-${pkgver}.tar.gz")
-md5sums=('fec0a4709cb25a89578ec4f2141d5831')
+md5sums=('2543da2200a9fe8d868e884f3b82bffd')
 
 build() {
 	cd "${srcdir}/${pkgname}-${pkgver}"

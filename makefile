@@ -1,7 +1,7 @@
 # sb - simple browser
 # See LICENSE file for copyright and license details
 
-VERSION=0.1
+VERSION=0.2
 
 CC=gcc
 CFLAGS=-g -Wall $(shell pkg-config --cflags gtk+-2.0 webkit-1.0) -DVERSION=\"${VERSION}\"
@@ -38,7 +38,7 @@ dist: clean
 	@echo creating dist tarball
 	@mkdir -p sb-${VERSION}
 	@cp -R LICENSE makefile config.h README.md \
-			TODO NEW \
+			TODO.md NEW \
 			${SRC} sb-${VERSION}
 	@tar -cf sb-${VERSION}.tar sb-${VERSION}
 	@gzip sb-${VERSION}.tar
