@@ -13,8 +13,6 @@
 
 #include "config.h"
 
-#include "menu.h"
-
 static GtkWidget* main_window;
 static GtkWidget* menu_bar;
 
@@ -768,7 +766,7 @@ home_cb (GtkWidget* widget, gpointer data)
  * Create a webkit webview instance in a scrolled window
  */
 static GtkWidget*
-create_browser ()
+create_scrolled_webview ()
 {
 	GtkWidget* scrolled_window = gtk_scrolled_window_new (NULL, NULL);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -776,14 +774,17 @@ create_browser ()
 	web_view = WEBKIT_WEB_VIEW (webkit_web_view_new ());
 	
 	gtk_container_add (GTK_CONTAINER (scrolled_window), GTK_WIDGET (web_view));
-
+	
+	/* Set up signals and callbacks */
 	g_signal_connect (G_OBJECT (web_view), "title-changed", G_CALLBACK (title_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "load-progress-changed", G_CALLBACK (progress_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "notify::load-status", G_CALLBACK (load_status_change_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "hovering-over-link", G_CALLBACK (link_hover_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "mime-type-policy-decision-requested", G_CALLBACK (decide_download_cb), web_view);
 	g_signal_connect (G_OBJECT (web_view), "download-requested", G_CALLBACK (init_download_cb), web_view);
-
+	
+	/* Set up accelerators for refresh, cancel, etc. */
+	
 	return scrolled_window;
 }
 
@@ -1127,7 +1128,7 @@ main (int argc, char* argv[])
 	gtk_box_pack_start (GTK_BOX (vbox), create_menubar (), FALSE, FALSE, 0);
 	main_toolbar = create_toolbar ();
 	gtk_box_pack_start (GTK_BOX (vbox), main_toolbar, FALSE, FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), create_browser (), TRUE, TRUE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox), create_scrolled_webview (), TRUE, TRUE, 0);
 	gtk_box_pack_start (GTK_BOX (vbox), create_statusbar (), FALSE, FALSE, 0);
 
 	gtk_container_add (GTK_CONTAINER (main_window), vbox);
