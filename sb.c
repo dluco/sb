@@ -13,6 +13,8 @@
 
 #include "config.h"
 
+#include "menu.h"
+
 static GtkWidget* main_window;
 static GtkWidget* menu_bar;
 
@@ -20,6 +22,7 @@ static GtkWidget* main_toolbar;
 static GtkToolItem* back_button;
 static GtkToolItem* forward_button;
 static GtkToolItem* refresh_button;
+static GtkToolItem* cancel_button;
 static GtkWidget* uri_entry;
 static GtkWidget* search_engine_entry;
 
@@ -171,13 +174,42 @@ decide_download_cb (WebKitWebView* web_view, WebKitWebFrame* frame, WebKitNetwor
 	return FALSE;
 }
 
+static const gchar*
+save_dialog_cb (const gchar *filename, char *directory)
+{
+	GtkWidget *dialog;
+	
+	dialog = gtk_file_chooser_dialog_new ("Save File",
+										GTK_WINDOW (main_window),
+										GTK_FILE_CHOOSER_ACTION_SAVE,
+										GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+										GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
+										NULL);
+	
+	gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (dialog), TRUE);
+	
+	gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (dialog), directory);
+	gtk_file_chooser_set_current_name (GTK_FILE_CHOOSER (dialog), filename);
+	
+	if (gtk_dialog_run (GTK_DIALOG (dialog)) == GTK_RESPONSE_ACCEPT)
+		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog));
+	
+	gtk_widget_destroy (dialog);
+	
+	return filename;
+}
+
 /*
  * Start the download of a file - use the server-recommended file name
  */
 static gboolean
 init_download_cb (WebKitWebView* web_view, WebKitDownload* download, gpointer data)
 {
-	const gchar* uri = g_strconcat ("file://", download_dir, webkit_download_get_suggested_filename (download), NULL);
+	const gchar *uri, *filename;
+	
+	filename = save_dialog_cb (webkit_download_get_suggested_filename (download), download_dir);
+	
+	uri = g_strconcat ("file://", filename, NULL);
 	webkit_download_set_destination_uri (download, uri);
 	
 	return TRUE;
@@ -222,15 +254,21 @@ load_status_change_cb (WebKitWebView* web_view, gpointer data)
 			uri = webkit_web_frame_get_uri (frame);
 			if (uri)
 				gtk_entry_set_text (GTK_ENTRY (uri_entry), uri);
+			/* Hide refresh button and show cancel button */
+			gtk_widget_hide (GTK_WIDGET (refresh_button));
+			gtk_widget_show (GTK_WIDGET (cancel_button));
 			break;
 		case WEBKIT_LOAD_FINISHED:
-			/* Update buttons - back, forward */
-			gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
-			gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
+			/* Show refresh button and hide cancel button */
+			gtk_widget_show (GTK_WIDGET (refresh_button));
+			gtk_widget_hide (GTK_WIDGET (cancel_button));
 			break;
 		default:
 			break;
 	}
+	/* Update buttons - back, forward */
+	gtk_widget_set_sensitive (GTK_WIDGET (back_button), webkit_web_view_can_go_back (web_view));
+	gtk_widget_set_sensitive (GTK_WIDGET (forward_button), webkit_web_view_can_go_forward (web_view));
 }
 
 
@@ -706,6 +744,18 @@ refresh_cb (GtkWidget* widget, gpointer data)
 }
 
 /*
+ * Callback for cancel button - cancel loading web page
+ */
+static void
+cancel_cb (GtkWidget* widget, gpointer data)
+{
+	webkit_web_view_stop_loading (web_view);
+	
+	gtk_widget_show (GTK_WIDGET (refresh_button));
+	gtk_widget_hide (GTK_WIDGET (cancel_button));
+}
+
+/*
  * Callback for home button - open home page
  */
 static void
@@ -962,7 +1012,13 @@ create_toolbar ()
 	gtk_widget_set_tooltip_text (GTK_WIDGET (refresh_button), "Reload the current page");
 	g_signal_connect (G_OBJECT (refresh_button), "clicked", G_CALLBACK (refresh_cb), NULL);
 	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), GTK_TOOL_ITEM (refresh_button), -1);
-
+	
+	/* The cancel button */
+	cancel_button = gtk_tool_button_new_from_stock (GTK_STOCK_CANCEL);
+	gtk_widget_set_tooltip_text (GTK_WIDGET (cancel_button), "Cancel loading the current page");
+	g_signal_connect (G_OBJECT (cancel_button), "clicked", G_CALLBACK (cancel_cb), NULL);
+	gtk_toolbar_insert (GTK_TOOLBAR (toolbar), GTK_TOOL_ITEM (cancel_button), -1);
+	
 	/* The URL entry */
 	uri_entry = gtk_entry_new ();
 	g_signal_connect (G_OBJECT (uri_entry), "activate", G_CALLBACK (activate_uri_entry_cb), NULL);
